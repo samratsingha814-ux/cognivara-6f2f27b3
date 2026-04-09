@@ -5,7 +5,7 @@
  * All methods return mock data for now — swap with real fetch calls.
  */
 
-const BASE_URL = "https://your-cognivara-api.com/api/v1";
+const BASE_URL = "https://cognivara-backend.onrender.com/api/v1";
 
 export interface RecordingSession {
   id: string;
