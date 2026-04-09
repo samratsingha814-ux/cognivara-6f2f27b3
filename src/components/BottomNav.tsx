@@ -1,7 +1,7 @@
-import { Home, Mic, BarChart3, User } from "lucide-react";
+import { Home, Mic, BarChart3, Clock, User } from "lucide-react";
 import { motion } from "framer-motion";
 
-type Tab = "home" | "record" | "dashboard" | "profile";
+type Tab = "home" | "record" | "dashboard" | "history" | "profile";
 
 interface BottomNavProps {
   activeTab: Tab;
@@ -12,6 +12,7 @@ const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "record", label: "Record", icon: Mic },
   { id: "dashboard", label: "Results", icon: BarChart3 },
+  { id: "history", label: "History", icon: Clock },
   { id: "profile", label: "Profile", icon: User },
 ];
 
@@ -25,7 +26,7 @@ const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
             <button
               key={id}
               onClick={() => onTabChange(id)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-colors relative ${
+              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-colors relative ${
                 isActive ? "text-primary" : "text-muted-foreground"
               }`}
             >

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, RotateCcw, CheckCircle2, Loader2 } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { submitRecording, RecordingSession } from "@/services/cognivaraApi";
+import { supabase } from "@/integrations/supabase/client";
 
 interface RecordScreenProps {
   onSessionComplete: (session: RecordingSession) => void;
@@ -28,6 +29,26 @@ const RecordScreen = ({ onSessionComplete }: RecordScreenProps) => {
     setIsAnalyzing(true);
     try {
       const session = await submitRecording(new Blob(), transcript);
+
+      // Save to database
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("recording_sessions").insert({
+          user_id: user.id,
+          session_date: session.date,
+          duration: session.duration,
+          transcript: session.transcript,
+          word_count: session.wordCount,
+          risk_score: session.riskScore,
+          stress: session.stress,
+          pitch: session.pitch,
+          hesitation: session.hesitation,
+          complexity: session.complexity,
+          fluency: session.fluency,
+          emotional_stability: session.emotionalStability,
+        });
+      }
+
       setCompletedSessions((prev) => [...prev, currentSession]);
       onSessionComplete(session);
       if (currentSession < 3) {
@@ -54,7 +75,6 @@ const RecordScreen = ({ onSessionComplete }: RecordScreenProps) => {
         Complete 3 recordings to establish your baseline.
       </p>
 
-      {/* Session pills */}
       <div className="flex gap-2 mb-8">
         {[1, 2, 3].map((s) => (
           <div
@@ -73,7 +93,6 @@ const RecordScreen = ({ onSessionComplete }: RecordScreenProps) => {
         ))}
       </div>
 
-      {/* Record button area */}
       <div className="flex-1 flex flex-col items-center justify-center">
         {!allDone && !isAnalyzing && (
           <p className="text-sm text-primary italic mb-6 text-center">
@@ -118,7 +137,6 @@ const RecordScreen = ({ onSessionComplete }: RecordScreenProps) => {
         </p>
       </div>
 
-      {/* Transcript */}
       <AnimatePresence>
         {(transcript || interimTranscript) && (
           <motion.div

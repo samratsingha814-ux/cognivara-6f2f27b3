@@ -4,10 +4,15 @@ import BottomNav, { Tab } from "@/components/BottomNav";
 import HomeScreen from "@/components/HomeScreen";
 import RecordScreen from "@/components/RecordScreen";
 import DashboardScreen from "@/components/DashboardScreen";
+import HistoryScreen from "@/components/HistoryScreen";
 import ProfileScreen from "@/components/ProfileScreen";
+import Auth from "@/pages/Auth";
+import { useAuth } from "@/hooks/useAuth";
 import { RecordingSession } from "@/services/cognivaraApi";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
+  const { user, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [sessions, setSessions] = useState<RecordingSession[]>([]);
 
@@ -16,6 +21,18 @@ const Index = () => {
   }, []);
 
   const handleStartRecording = () => setActiveTab("record");
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth />;
+  }
 
   return (
     <div className="min-h-screen bg-background max-w-lg mx-auto relative">
@@ -30,7 +47,8 @@ const Index = () => {
           {activeTab === "home" && <HomeScreen onStartRecording={handleStartRecording} />}
           {activeTab === "record" && <RecordScreen onSessionComplete={handleSessionComplete} />}
           {activeTab === "dashboard" && <DashboardScreen sessions={sessions} />}
-          {activeTab === "profile" && <ProfileScreen />}
+          {activeTab === "history" && <HistoryScreen />}
+          {activeTab === "profile" && <ProfileScreen onSignOut={signOut} />}
         </motion.div>
       </AnimatePresence>
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
