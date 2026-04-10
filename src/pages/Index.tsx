@@ -4,7 +4,6 @@ import BottomNav, { Tab } from "@/components/BottomNav";
 import HomeScreen from "@/components/HomeScreen";
 import RecordScreen from "@/components/RecordScreen";
 import DashboardScreen from "@/components/DashboardScreen";
-import HistoryScreen from "@/components/HistoryScreen";
 import ProfileScreen from "@/components/ProfileScreen";
 import Auth from "@/pages/Auth";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,8 +45,7 @@ const Index = () => {
         >
           {activeTab === "home" && <HomeScreen onStartRecording={handleStartRecording} />}
           {activeTab === "record" && <RecordScreen onSessionComplete={handleSessionComplete} />}
-          {activeTab === "dashboard" && <DashboardScreen sessions={sessions} />}
-          {activeTab === "history" && <HistoryScreen />}
+          {activeTab === "insights" && <DashboardScreen sessions={sessions} />}
           {activeTab === "profile" && <ProfileScreen onSignOut={signOut} />}
         </motion.div>
       </AnimatePresence>

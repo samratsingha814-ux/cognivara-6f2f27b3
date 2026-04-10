@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Brain, Loader2 } from "lucide-react";
+import { Activity, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Input } from "@/components/ui/input";
@@ -50,43 +50,50 @@ const Auth = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-sm"
       >
-        <div className="flex items-center gap-2.5 justify-center mb-8">
-          <Brain className="h-8 w-8 text-primary" />
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 justify-center mb-10">
+          <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
+            <Activity className="h-5 w-5 text-primary" />
+          </div>
           <span className="font-heading text-2xl font-bold tracking-tight">COGNIVARA</span>
         </div>
 
-        <div className="rounded-2xl bg-card border border-border p-6">
+        <div className="rounded-2xl bg-gradient-card border border-border p-6 shadow-card">
           <h1 className="font-heading text-xl font-bold mb-1 text-center">
             {isLogin ? "Welcome Back" : "Create Account"}
           </h1>
           <p className="text-xs text-muted-foreground text-center mb-6">
-            {isLogin ? "Sign in to access your cognitive profile" : "Start monitoring your cognitive health"}
+            {isLogin ? "Sign in to access your neural profile" : "Start monitoring your cognitive health"}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Display Name</label>
+                <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
+                  Display Name
+                </label>
                 <Input
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Your name"
                   required={!isLogin}
+                  className="bg-secondary border-border"
                 />
               </div>
             )}
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Email</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">Email</label>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
+                className="bg-secondary border-border"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Password</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">Password</label>
               <Input
                 type="password"
                 value={password}
@@ -94,23 +101,24 @@ const Auth = () => {
                 placeholder="••••••••"
                 required
                 minLength={6}
+                className="bg-secondary border-border"
               />
             </div>
 
             {error && <p className="text-xs text-destructive">{error}</p>}
-            {message && <p className="text-xs text-primary">{message}</p>}
+            {message && <p className="text-xs text-accent">{message}</p>}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-primary text-primary-foreground py-3 rounded-xl font-heading font-semibold text-sm disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-primary text-primary-foreground py-3.5 rounded-xl font-heading font-semibold text-sm disabled:opacity-50 shadow-glow"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {isLogin ? "Sign In" : "Sign Up"}
             </button>
           </form>
 
-          <div className="flex items-center gap-3 my-4">
+          <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-border" />
             <span className="text-xs text-muted-foreground">or</span>
             <div className="flex-1 h-px bg-border" />
@@ -126,7 +134,7 @@ const Auth = () => {
                 setError(result.error instanceof Error ? result.error.message : "Google sign-in failed");
               }
             }}
-            className="w-full flex items-center justify-center gap-2 border border-border py-3 rounded-xl text-sm font-medium hover:bg-secondary/50 transition-colors"
+            className="w-full flex items-center justify-center gap-2 border border-border py-3.5 rounded-xl text-sm font-medium hover:bg-secondary/50 transition-colors"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -137,7 +145,7 @@ const Auth = () => {
             Continue with Google
           </button>
 
-          <p className="text-xs text-muted-foreground text-center mt-4">
+          <p className="text-xs text-muted-foreground text-center mt-5">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
               onClick={() => { setIsLogin(!isLogin); setError(""); setMessage(""); }}
