@@ -1,7 +1,7 @@
-import { Home, Mic, BarChart3, Clock, User } from "lucide-react";
+import { Home, Mic, Activity, User } from "lucide-react";
 import { motion } from "framer-motion";
 
-type Tab = "home" | "record" | "dashboard" | "history" | "profile";
+type Tab = "home" | "record" | "insights" | "profile";
 
 interface BottomNavProps {
   activeTab: Tab;
@@ -9,26 +9,23 @@ interface BottomNavProps {
 }
 
 const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "record", label: "Record", icon: Mic },
-  { id: "dashboard", label: "Results", icon: BarChart3 },
-  { id: "history", label: "History", icon: Clock },
-  { id: "profile", label: "Profile", icon: User },
+  { id: "home", label: "HOME", icon: Home },
+  { id: "record", label: "RECORD", icon: Mic },
+  { id: "insights", label: "INSIGHTS", icon: Activity },
+  { id: "profile", label: "PROFILE", icon: User },
 ];
 
 const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-border safe-bottom">
-      <div className="flex items-center justify-around px-2 py-2">
+      <div className="flex items-center justify-around px-2 py-2 max-w-lg mx-auto">
         {tabs.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id;
           return (
             <button
               key={id}
               onClick={() => onTabChange(id)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-colors relative ${
-                isActive ? "text-primary" : "text-muted-foreground"
-              }`}
+              className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all relative"
             >
               {isActive && (
                 <motion.div
@@ -37,8 +34,18 @@ const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 />
               )}
-              <Icon className="h-5 w-5 relative z-10" />
-              <span className="text-[10px] font-medium relative z-10">{label}</span>
+              <Icon
+                className={`h-5 w-5 relative z-10 transition-colors ${
+                  isActive ? "text-primary" : "text-muted-foreground"
+                }`}
+              />
+              <span
+                className={`text-[9px] font-semibold tracking-wider relative z-10 transition-colors ${
+                  isActive ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                {label}
+              </span>
             </button>
           );
         })}

@@ -1,80 +1,215 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Brain, Mic, Shield, TrendingUp } from "lucide-react";
+import { Bell, Sparkles, Activity, Zap, Shield } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface HomeScreenProps {
   onStartRecording: () => void;
 }
 
-const features = [
-  { icon: Mic, title: "Voice Analysis", desc: "30-second recording to detect cognitive biomarkers" },
-  { icon: Shield, title: "94.2% Accuracy", desc: "Clinical-grade detection backed by research" },
-  { icon: TrendingUp, title: "6-Month Early Detection", desc: "Spot patterns before visible symptoms" },
-];
+const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 const HomeScreen = ({ onStartRecording }: HomeScreenProps) => {
+  const { user } = useAuth();
+  const [cognitiveScore, setCognitiveScore] = useState(76);
+  const [weeklyData, setWeeklyData] = useState<number[]>([30, 45, 55, 40, 50, 60, 80]);
+  const [latency, setLatency] = useState("42ms");
+  const [focus, setFocus] = useState("High");
+
+  useEffect(() => {
+    const fetchLatestData = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("recording_sessions")
+        .select("risk_score, fluency, complexity")
+        .eq("user_id", user.id)
+        .order("session_date", { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const score = Math.max(0, 100 - data[0].risk_score);
+        setCognitiveScore(score);
+      }
+    };
+    fetchLatestData();
+  }, [user]);
+
+  const circumference = 2 * Math.PI * 70;
+  const offset = circumference - (cognitiveScore / 100) * circumference;
+  const scoreLabel = cognitiveScore >= 70 ? "OPTIMAL" : cognitiveScore >= 40 ? "MODERATE" : "LOW";
+
   return (
-    <div className="px-5 pt-14 pb-24">
+    <div className="px-5 pt-12 pb-28">
       {/* Header */}
-      <div className="flex items-center gap-2.5 mb-8">
-        <Brain className="h-7 w-7 text-primary" />
-        <span className="font-heading text-xl font-bold tracking-tight">COGNIVARA</span>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center">
+            <Activity className="h-4 w-4 text-primary" />
+          </div>
+          <span className="font-heading text-lg font-bold tracking-tight text-foreground">
+            COGNIVARA
+          </span>
+        </div>
+        <button className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center">
+          <Bell className="h-4 w-4 text-muted-foreground" />
+        </button>
       </div>
 
-      {/* Hero card */}
+      {/* Cognitive Score Card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl bg-gradient-primary p-6 mb-8"
+        className="rounded-2xl bg-gradient-card border border-border p-6 mb-6 shadow-card"
       >
-        <h1 className="font-heading text-2xl font-bold text-primary-foreground leading-tight mb-2">
-          Monitor Your Cognitive Health
-        </h1>
-        <p className="text-sm text-primary-foreground/80 mb-5 leading-relaxed">
-          Analyze speech biomarkers to detect subtle cognitive strain patterns early.
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium">
+              Morning Baseline
+            </p>
+            <h2 className="font-heading text-xl font-bold text-foreground mt-1">Cognitive Score</h2>
+          </div>
+          <Sparkles className="h-5 w-5 text-accent" />
+        </div>
+
+        <div className="flex justify-center py-4">
+          <div className="relative">
+            <svg width="180" height="180" viewBox="0 0 180 180" className="score-ring">
+              <circle
+                cx="90"
+                cy="90"
+                r="70"
+                fill="none"
+                stroke="hsl(222, 18%, 16%)"
+                strokeWidth="10"
+              />
+              <circle
+                cx="90"
+                cy="90"
+                r="70"
+                fill="none"
+                stroke="url(#scoreGradient)"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={offset}
+                transform="rotate(-90 90 90)"
+                className="transition-all duration-1000"
+              />
+              <defs>
+                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="hsl(190, 80%, 50%)" />
+                  <stop offset="100%" stopColor="hsl(210, 90%, 55%)" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-heading text-4xl font-bold text-foreground">{cognitiveScore}</span>
+              <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-medium">
+                {scoreLabel}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground text-center">
+          Your neural connectivity is{" "}
+          <span className="text-accent font-semibold">12% higher</span> than yesterday's average.
         </p>
-        <button
-          onClick={onStartRecording}
-          className="flex items-center gap-2 bg-background text-foreground px-5 py-3 rounded-xl font-heading font-semibold text-sm"
-        >
-          <Mic className="h-4 w-4" />
-          Start Recording
-        </button>
       </motion.div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3 mb-8">
-        {[
-          { val: "30s", label: "Analysis" },
-          { val: "6mo", label: "Early Detect" },
-          { val: "2.4K+", label: "Participants" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl bg-card border border-border p-3 text-center">
-            <p className="font-heading text-lg font-bold">{s.val}</p>
-            <p className="text-[10px] text-muted-foreground">{s.label}</p>
-          </div>
-        ))}
+      {/* Quick Actions */}
+      <h3 className="font-heading text-sm font-semibold text-foreground mb-3">Quick Actions</h3>
+      <motion.button
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        onClick={onStartRecording}
+        className="w-full rounded-2xl bg-gradient-cta p-5 mb-6 flex items-center gap-4 text-left shadow-glow"
+      >
+        <div className="h-12 w-12 rounded-xl bg-background/20 flex items-center justify-center flex-shrink-0">
+          <Activity className="h-6 w-6 text-primary-foreground" />
+        </div>
+        <div>
+          <h3 className="font-heading text-base font-bold text-primary-foreground uppercase tracking-wide">
+            Start Voice Analysis
+          </h3>
+          <p className="text-xs text-primary-foreground/70 mt-0.5">
+            Check neural latency via speech patterns
+          </p>
+        </div>
+      </motion.button>
+
+      {/* Performance Trends */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-heading text-sm font-semibold text-foreground">Performance Trends</h3>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          Last 7 Days
+        </span>
       </div>
 
-      {/* Features */}
-      <h2 className="font-heading text-lg font-semibold mb-4">How It Works</h2>
-      <div className="space-y-3">
-        {features.map((f, i) => (
-          <motion.div
-            key={f.title}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 + i * 0.1 }}
-            className="flex items-start gap-4 rounded-xl bg-card border border-border p-4"
-          >
-            <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <f.icon className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-heading text-sm font-semibold">{f.title}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{f.desc}</p>
-            </div>
-          </motion.div>
-        ))}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="rounded-2xl bg-gradient-card border border-border p-5 mb-5 shadow-card"
+      >
+        <div className="flex items-end justify-between gap-2 h-28">
+          {weeklyData.map((val, i) => {
+            const isToday = i === weeklyData.length - 1;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                {isToday && (
+                  <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium">
+                    Today
+                  </span>
+                )}
+                <div className="w-full flex justify-center">
+                  <div
+                    className={`w-5 rounded-t-md transition-all ${
+                      isToday ? "bg-gradient-primary" : "bg-secondary"
+                    }`}
+                    style={{ height: `${(val / 100) * 80}px` }}
+                  />
+                </div>
+                <span className="text-[9px] text-muted-foreground font-medium">{DAYS[i]}</span>
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <motion.div
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+          className="rounded-2xl bg-gradient-card border border-border p-4 shadow-card"
+        >
+          <div className="h-9 w-9 rounded-lg bg-primary/15 flex items-center justify-center mb-3">
+            <Zap className="h-4 w-4 text-primary" />
+          </div>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+            Latency
+          </p>
+          <p className="font-heading text-xl font-bold text-foreground">{latency}</p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.35 }}
+          className="rounded-2xl bg-gradient-card border border-border p-4 shadow-card"
+        >
+          <div className="h-9 w-9 rounded-lg bg-accent/15 flex items-center justify-center mb-3">
+            <Shield className="h-4 w-4 text-accent" />
+          </div>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+            Focus
+          </p>
+          <p className="font-heading text-xl font-bold text-accent">{focus}</p>
+        </motion.div>
       </div>
     </div>
   );

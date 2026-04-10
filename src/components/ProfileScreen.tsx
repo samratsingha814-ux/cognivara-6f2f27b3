@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Brain, ChevronRight, Download, LogOut, Settings, User } from "lucide-react";
+import { motion } from "framer-motion";
+import { Bell, User, ChevronRight, LogOut, Shield, Target, Bell as BellIcon, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -9,8 +10,8 @@ interface ProfileScreenProps {
 
 const ProfileScreen = ({ onSignOut }: ProfileScreenProps) => {
   const { user } = useAuth();
-  const [displayName, setDisplayName] = useState("COGNIVARA User");
-  const [totalRecordings, setTotalRecordings] = useState(0);
+  const [displayName, setDisplayName] = useState("User");
+  const [joinDate, setJoinDate] = useState("");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -18,78 +19,138 @@ const ProfileScreen = ({ onSignOut }: ProfileScreenProps) => {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("display_name")
+        .select("display_name, created_at")
         .eq("user_id", user.id)
         .single();
 
       if (profile?.display_name) setDisplayName(profile.display_name);
-
-      const { count } = await supabase
-        .from("recording_sessions")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
-      setTotalRecordings(count || 0);
+      if (profile?.created_at) {
+        setJoinDate(
+          new Date(profile.created_at).toLocaleDateString(undefined, {
+            month: "long",
+            year: "numeric",
+          })
+        );
+      }
     };
     fetchProfile();
   }, [user]);
 
+  const userId = user?.id?.slice(0, 8).toUpperCase() || "----";
+
+  const menuItems = [
+    {
+      icon: User,
+      title: "Account Details",
+      subtitle: "Personal info & preferences",
+      color: "bg-primary/15",
+      iconColor: "text-primary",
+    },
+    {
+      icon: Target,
+      title: "Health Goals",
+      subtitle: "Neuro-performance targets",
+      color: "bg-accent/15",
+      iconColor: "text-accent",
+    },
+    {
+      icon: Shield,
+      title: "Privacy & Security",
+      subtitle: "Biometric & data encryption",
+      color: "bg-primary/15",
+      iconColor: "text-primary",
+    },
+    {
+      icon: BellIcon,
+      title: "Notifications",
+      subtitle: "Alerts, insights & reminders",
+      color: "bg-muted",
+      iconColor: "text-muted-foreground",
+    },
+  ];
+
   return (
-    <div className="px-5 pt-14 pb-24">
-      <h1 className="font-heading text-2xl font-bold mb-6">Profile</h1>
-
-      <div className="rounded-2xl bg-card border border-border p-5 flex items-center gap-4 mb-6">
-        <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
-          <User className="h-7 w-7 text-primary" />
+    <div className="px-5 pt-12 pb-28">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center">
+            <Activity className="h-4 w-4 text-primary" />
+          </div>
+          <span className="font-heading text-lg font-bold tracking-tight">COGNIVARA</span>
         </div>
-        <div>
-          <p className="font-heading font-semibold">{displayName}</p>
-          <p className="text-xs text-muted-foreground">{user?.email}</p>
-        </div>
+        <button className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center">
+          <Bell className="h-4 w-4 text-muted-foreground" />
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="rounded-xl bg-card border border-border p-4 text-center">
-          <p className="font-heading text-2xl font-bold">{totalRecordings}</p>
-          <p className="text-[10px] text-muted-foreground">Total Recordings</p>
+      {/* Avatar Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center mb-8"
+      >
+        <div className="relative mb-4">
+          <div className="h-24 w-24 rounded-2xl bg-gradient-card border border-border flex items-center justify-center shadow-card">
+            <User className="h-12 w-12 text-muted-foreground" />
+          </div>
+          <div className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-primary flex items-center justify-center border-2 border-background">
+            <svg
+              className="h-3 w-3 text-primary-foreground"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            </svg>
+          </div>
         </div>
-        <div className="rounded-xl bg-card border border-border p-4 text-center">
-          <p className="font-heading text-2xl font-bold text-primary">
-            {totalRecordings >= 3 ? "Active" : "Setup"}
-          </p>
-          <p className="text-[10px] text-muted-foreground">Status</p>
-        </div>
-      </div>
 
-      <div className="rounded-xl bg-card border border-border overflow-hidden">
-        {[
-          { icon: Settings, label: "Account Settings" },
-          { icon: Download, label: "Export Report (PDF)" },
-          { icon: Brain, label: "About COGNIVARA" },
-        ].map(({ icon: Icon, label }, i) => (
-          <button
-            key={label}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 text-sm text-left hover:bg-secondary/50 transition-colors ${
-              i < 2 ? "border-b border-border" : ""
-            }`}
+        <p className="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1">
+          Neural Resident
+        </p>
+        <h1 className="font-heading text-2xl font-bold text-foreground">{displayName}</h1>
+        <p className="text-xs text-muted-foreground mt-1">
+          {joinDate ? `Joined ${joinDate}` : ""} · ID: CNV-{userId}
+        </p>
+      </motion.div>
+
+      {/* Menu Items */}
+      <div className="space-y-3 mb-8">
+        {menuItems.map((item, i) => (
+          <motion.button
+            key={item.title}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.06 }}
+            className="w-full rounded-2xl bg-gradient-card border border-border p-4 flex items-center gap-4 text-left shadow-card hover:border-primary/20 transition-colors"
           >
-            <Icon className="h-4 w-4 text-muted-foreground" />
-            <span className="flex-1">{label}</span>
+            <div className={`h-11 w-11 rounded-xl ${item.color} flex items-center justify-center flex-shrink-0`}>
+              <item.icon className={`h-5 w-5 ${item.iconColor}`} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-heading text-sm font-semibold text-foreground">{item.title}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{item.subtitle}</p>
+            </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </button>
+          </motion.button>
         ))}
       </div>
 
+      {/* Sign Out */}
       <button
         onClick={onSignOut}
-        className="w-full mt-4 flex items-center justify-center gap-2 rounded-xl border border-destructive/30 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-3.5 text-sm font-heading font-semibold text-primary uppercase tracking-wider"
       >
         <LogOut className="h-4 w-4" />
         Sign Out
       </button>
 
-      <p className="text-center text-[10px] text-muted-foreground mt-8">
-        COGNIVARA v1.0 · For investigational use only
+      <p className="text-center text-[10px] text-muted-foreground mt-6">
+        VERSION 2.4.0-BETA
       </p>
     </div>
   );
