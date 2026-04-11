@@ -2,12 +2,12 @@ import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, RotateCcw, Loader2, Bell, Activity, Lightbulb } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
-import { uploadSession } from "@/services/cognivaraApi";
+import { uploadSession, UploadResponse } from "@/services/cognivaraApi";
 
 interface RecordScreenProps {
   userId: string;
   sessionCount: number;
-  onSessionUploaded: () => void;
+  onSessionUploaded: (result: UploadResponse) => void;
 }
 
 const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenProps) => {
@@ -28,12 +28,10 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       mediaRecorderRef.current = recorder;
-
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
-
-      recorder.start(250); // collect chunks every 250ms
+      recorder.start(250);
     } catch {
       console.warn("Could not start media recorder, will upload empty audio");
     }
@@ -44,7 +42,6 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
   const handleStop = useCallback(async () => {
     stopRecording();
 
-    // Stop media recorder
     const recorder = mediaRecorderRef.current;
     let audioBlob = new Blob([], { type: "audio/webm" });
 
@@ -56,21 +53,20 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
       if (audioChunksRef.current.length > 0) {
         audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
       }
-      // Stop all tracks
       recorder.stream.getTracks().forEach((t) => t.stop());
     }
 
+    // Don't block on transcript — upload with whatever we have
     setIsUploading(true);
     try {
-      // Upload with whatever transcript we have (may be empty)
-      await uploadSession(userId, audioBlob, currentSessionNum, transcript || "");
-      onSessionUploaded();
+      const result = await uploadSession(userId, audioBlob, transcript || "");
+      onSessionUploaded(result);
     } catch (err: any) {
       setUploadError(err.message || "Upload failed");
     } finally {
       setIsUploading(false);
     }
-  }, [stopRecording, transcript, userId, currentSessionNum, onSessionUploaded]);
+  }, [stopRecording, transcript, userId, onSessionUploaded]);
 
   const handleReset = () => {
     resetTranscript();
@@ -117,28 +113,24 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
           transition={{ repeat: Infinity, duration: 2 }}
         >
           {isRecording && (
-            <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex flex-col gap-1">
-              {[3, 5, 8, 5, 3].map((h, i) => (
-                <motion.div
-                  key={i}
-                  className="w-1 rounded-full bg-primary/40"
-                  animate={{ height: [h * 3, h * 6, h * 3] }}
-                  transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.1 }}
-                />
-              ))}
-            </div>
-          )}
-          {isRecording && (
-            <div className="absolute -right-8 top-1/2 -translate-y-1/2 flex flex-col gap-1">
-              {[3, 5, 8, 5, 3].map((h, i) => (
-                <motion.div
-                  key={i}
-                  className="w-1 rounded-full bg-primary/40"
-                  animate={{ height: [h * 3, h * 6, h * 3] }}
-                  transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.15 }}
-                />
-              ))}
-            </div>
+            <>
+              <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex flex-col gap-1">
+                {[3, 5, 8, 5, 3].map((h, i) => (
+                  <motion.div key={i} className="w-1 rounded-full bg-primary/40"
+                    animate={{ height: [h * 3, h * 6, h * 3] }}
+                    transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.1 }}
+                  />
+                ))}
+              </div>
+              <div className="absolute -right-8 top-1/2 -translate-y-1/2 flex flex-col gap-1">
+                {[3, 5, 8, 5, 3].map((h, i) => (
+                  <motion.div key={i} className="w-1 rounded-full bg-primary/40"
+                    animate={{ height: [h * 3, h * 6, h * 3] }}
+                    transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.15 }}
+                  />
+                ))}
+              </div>
+            </>
           )}
 
           <div className="rounded-2xl bg-gradient-card border border-border p-8 shadow-card">
@@ -149,9 +141,7 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
               className={`h-20 w-20 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all ${
                 isRecording
                   ? "bg-primary/20 border-2 border-primary shadow-glow"
-                  : isUploading
-                  ? "bg-muted"
-                  : "bg-secondary hover:bg-secondary/80"
+                  : isUploading ? "bg-muted" : "bg-secondary hover:bg-secondary/80"
               }`}
             >
               {isUploading ? (
@@ -169,22 +159,18 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
           </div>
         </motion.div>
 
-        {/* Stop / Start Button */}
         <button
           onClick={isRecording ? handleStop : handleStart}
           disabled={isUploading}
           className={`w-full py-4 rounded-2xl font-heading font-semibold text-base transition-all ${
             isRecording
               ? "bg-gradient-cta text-primary-foreground shadow-glow"
-              : isUploading
-              ? "bg-muted text-muted-foreground"
-              : "bg-gradient-primary text-primary-foreground shadow-glow"
+              : isUploading ? "bg-muted text-muted-foreground" : "bg-gradient-primary text-primary-foreground shadow-glow"
           }`}
         >
           {isUploading ? "Uploading..." : isRecording ? "Stop Recording" : "Start Recording"}
         </button>
 
-        {/* Upload Status */}
         {isUploading && (
           <div className="flex items-center gap-2 mt-3">
             <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
@@ -192,18 +178,13 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
           </div>
         )}
 
-        {uploadError && (
-          <p className="text-sm text-red-400 mt-3">{uploadError}</p>
-        )}
+        {uploadError && <p className="text-sm text-destructive mt-3">{uploadError}</p>}
       </div>
 
-      {/* Tips Card */}
+      {/* Tips */}
       <AnimatePresence>
         {!isRecording && !isUploading && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="rounded-2xl bg-gradient-card border border-border p-4 mt-4 flex items-start gap-3"
           >
             <div className="h-9 w-9 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -222,10 +203,7 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
       {/* Transcript */}
       <AnimatePresence>
         {(transcript || interimTranscript) && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="rounded-2xl bg-gradient-card border border-border p-4 mt-3"
           >
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
@@ -240,8 +218,7 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
       </AnimatePresence>
 
       {transcript && !isRecording && !isUploading && (
-        <button
-          onClick={handleReset}
+        <button onClick={handleReset}
           className="flex items-center justify-center gap-2 mt-3 text-xs text-muted-foreground"
         >
           <RotateCcw className="h-3 w-3" /> Reset
