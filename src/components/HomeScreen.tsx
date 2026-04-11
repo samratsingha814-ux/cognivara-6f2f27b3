@@ -11,11 +11,10 @@ interface HomeScreenProps {
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 const HomeScreen = ({ onStartRecording, dashboard, sessionCount }: HomeScreenProps) => {
-  const cognitiveScore = dashboard?.cognitive_score ??
-    (dashboard?.risk_score != null ? Math.max(0, 100 - dashboard.risk_score) : 0);
+  const cognitiveScore = dashboard?.latest_csi != null ? Math.round(dashboard.latest_csi) : 0;
   const hasData = dashboard != null;
 
-  const weeklyData = dashboard?.trends?.map((t) => t.score) || [0, 0, 0, 0, 0, 0, 0];
+  const weeklyData = dashboard?.trends?.map((t) => t.csi) || [0, 0, 0, 0, 0, 0, 0];
 
   const circumference = 2 * Math.PI * 70;
   const offset = circumference - (cognitiveScore / 100) * circumference;

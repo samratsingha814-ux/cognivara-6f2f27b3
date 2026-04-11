@@ -1,22 +1,26 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Activity, Loader2 } from "lucide-react";
-import { createUser, CreateUserRequest } from "@/services/cognivaraApi";
+import { createUser } from "@/services/cognivaraApi";
+import { useAuth } from "@/hooks/useAuth";
 
 interface OnboardingScreenProps {
   onComplete: (userId: string) => void;
 }
 
 const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
-  const [name, setName] = useState("");
+  const { user } = useAuth();
+  const [name, setName] = useState(user?.user_metadata?.display_name || "");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("male");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const email = user?.email || "";
+
   const handleSubmit = async () => {
-    if (!name.trim() || !age.trim()) {
-      setError("Please fill in all fields.");
+    if (!name.trim()) {
+      setError("Please enter your name.");
       return;
     }
     setError("");
@@ -24,10 +28,11 @@ const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
     try {
       const result = await createUser({
         name: name.trim(),
-        age: parseInt(age, 10),
-        gender,
+        email,
+        age: age ? parseInt(age, 10) : undefined,
+        gender: gender || undefined,
       });
-      onComplete(result.user_id);
+      onComplete(String(result.user_id));
     } catch (err: any) {
       setError(err.message || "Failed to create profile. Try again.");
     } finally {
@@ -71,7 +76,19 @@ const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
 
           <div>
             <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1.5 block">
-              Age
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              disabled
+              className="w-full rounded-xl bg-secondary/50 border border-border px-4 py-3.5 text-sm text-muted-foreground"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1.5 block">
+              Age <span className="text-muted-foreground/60">(optional)</span>
             </label>
             <input
               type="number"
@@ -84,7 +101,7 @@ const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
 
           <div>
             <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1.5 block">
-              Gender
+              Gender <span className="text-muted-foreground/60">(optional)</span>
             </label>
             <div className="flex gap-3">
               {["male", "female", "other"].map((g) => (
@@ -104,9 +121,7 @@ const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
           </div>
         </div>
 
-        {error && (
-          <p className="text-sm text-red-400 mt-4">{error}</p>
-        )}
+        {error && <p className="text-sm text-destructive mt-4">{error}</p>}
 
         <button
           onClick={handleSubmit}
