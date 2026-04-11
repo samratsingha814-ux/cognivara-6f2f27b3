@@ -1,116 +1,121 @@
 /**
- * COGNIVARA API Service
- * 
- * Replace BASE_URL with your actual COGNIVARA backend URL.
- * All methods return mock data for now — swap with real fetch calls.
+ * COGNIVARA API Service — Real Backend
  */
 
-const BASE_URL = "https://cognivara-backend.onrender.com/api/v1";
+const BASE_URL = "https://cognivara-backend-service.onrender.com/api";
 
-export interface RecordingSession {
-  id: string;
-  date: string;
-  duration: number;
-  transcript: string;
-  wordCount: number;
-  riskScore: number;
-  stress: number;
-  pitch: number;
-  hesitation: number;
-  complexity: number;
-  fluency: number;
-  emotionalStability: number;
-}
+// --- Response Types ---
 
-export interface CognitiveProfile {
-  riskScore: number;
-  riskLevel: "low" | "moderate" | "elevated";
-  emotionalStability: number;
-  cognitiveComplexity: number;
-  speechFluency: number;
-  totalRecordings: number;
-  baselineEstablished: boolean;
-  trends: { day: string; score: number }[];
-}
-
-export interface ReferencePatient {
-  id: string;
-  name: string;
+export interface HealthResponse {
   status: string;
-  riskScore: number;
-  csi: number;
+  [key: string]: unknown;
 }
 
-// --- Mock helpers ---
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export interface CreateUserRequest {
+  name: string;
+  age: number;
+  gender: string;
+}
 
-const mockSession = (transcript: string, sessionNum: number): RecordingSession => ({
-  id: crypto.randomUUID(),
-  date: new Date().toISOString(),
-  duration: 30,
-  transcript,
-  wordCount: transcript.split(/\s+/).filter(Boolean).length,
-  riskScore: Math.round(15 + Math.random() * 50),
-  stress: Math.round(20 + Math.random() * 40),
-  pitch: Math.round(30 + Math.random() * 50),
-  hesitation: Math.round(10 + Math.random() * 35),
-  complexity: Math.round(40 + Math.random() * 45),
-  fluency: Math.round(50 + Math.random() * 40),
-  emotionalStability: Math.round(55 + Math.random() * 35),
-});
+export interface CreateUserResponse {
+  user_id: string;
+  [key: string]: unknown;
+}
+
+export interface UploadResponse {
+  session_id?: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
+export interface DashboardResponse {
+  user_id?: string;
+  sessions_completed?: number;
+  cognitive_score?: number;
+  risk_score?: number;
+  risk_level?: string;
+  biomarkers?: Record<string, number>;
+  summary?: string;
+  trends?: { day: string; score: number }[];
+  [key: string]: unknown;
+}
+
+export interface SessionResponse {
+  id?: string;
+  session_date?: string;
+  duration?: number;
+  transcript?: string;
+  [key: string]: unknown;
+}
+
+// --- Local user_id storage ---
+
+const USER_ID_KEY = "cognivara_user_id";
+
+export function getStoredUserId(): string | null {
+  return localStorage.getItem(USER_ID_KEY);
+}
+
+export function setStoredUserId(userId: string) {
+  localStorage.setItem(USER_ID_KEY, userId);
+}
+
+export function clearStoredUserId() {
+  localStorage.removeItem(USER_ID_KEY);
+}
 
 // --- API Methods ---
 
-/** Submit a voice recording for analysis */
-export async function submitRecording(audioBlob: Blob, transcript: string): Promise<RecordingSession> {
-  // TODO: Replace with real API call
-  // const formData = new FormData();
-  // formData.append("audio", audioBlob);
-  // formData.append("transcript", transcript);
-  // const res = await fetch(`${BASE_URL}/recordings`, { method: "POST", body: formData });
-  // return res.json();
-  
-  await delay(2000);
-  return mockSession(transcript, 1);
+export async function checkHealth(): Promise<HealthResponse> {
+  const res = await fetch(`${BASE_URL}/health`);
+  if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
+  return res.json();
 }
 
-/** Fetch the user's cognitive profile */
-export async function getCognitiveProfile(): Promise<CognitiveProfile> {
-  // TODO: const res = await fetch(`${BASE_URL}/profile`); return res.json();
-  
-  await delay(800);
-  return {
-    riskScore: Math.round(20 + Math.random() * 40),
-    riskLevel: "low",
-    emotionalStability: Math.round(60 + Math.random() * 30),
-    cognitiveComplexity: Math.round(50 + Math.random() * 40),
-    speechFluency: Math.round(55 + Math.random() * 35),
-    totalRecordings: 3,
-    baselineEstablished: true,
-    trends: Array.from({ length: 7 }, (_, i) => ({
-      day: `Day ${i + 1}`,
-      score: Math.round(25 + Math.random() * 35),
-    })),
-  };
+export async function createUser(data: CreateUserRequest): Promise<CreateUserResponse> {
+  const res = await fetch(`${BASE_URL}/user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`User creation failed: ${res.status}`);
+  const result = await res.json();
+  if (result.user_id) {
+    setStoredUserId(result.user_id);
+  }
+  return result;
 }
 
-/** Fetch recording history */
-export async function getRecordingHistory(): Promise<RecordingSession[]> {
-  // TODO: const res = await fetch(`${BASE_URL}/recordings`); return res.json();
-  
-  await delay(600);
-  return Array.from({ length: 5 }, (_, i) => ({
-    ...mockSession(`Session ${i + 1} transcript placeholder text.`, i + 1),
-    date: new Date(Date.now() - i * 86400000).toISOString(),
-  }));
+export async function uploadSession(
+  userId: string,
+  audioBlob: Blob,
+  sessionNumber: number,
+  transcript: string = ""
+): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append("user_id", userId);
+  formData.append("session_number", String(sessionNumber));
+  formData.append("audio", audioBlob, `session_${sessionNumber}.webm`);
+  if (transcript) {
+    formData.append("transcript", transcript);
+  }
+
+  const res = await fetch(`${BASE_URL}/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  return res.json();
 }
 
-/** Fetch reference patients for comparison */
-export async function getReferencePatients(): Promise<ReferencePatient[]> {
-  await delay(400);
-  return [
-    { id: "a", name: "Patient A", status: "Stable", riskScore: 22, csi: 78 },
-    { id: "b", name: "Patient B", status: "Worsening", riskScore: 68, csi: 35 },
-    { id: "c", name: "Patient C", status: "Recovery", riskScore: 38, csi: 62 },
-  ];
+export async function getDashboard(userId: string): Promise<DashboardResponse> {
+  const res = await fetch(`${BASE_URL}/dashboard/${userId}`);
+  if (!res.ok) throw new Error(`Dashboard fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getSessions(userId: string): Promise<SessionResponse[]> {
+  const res = await fetch(`${BASE_URL}/sessions/${userId}`);
+  if (!res.ok) throw new Error(`Sessions fetch failed: ${res.status}`);
+  return res.json();
 }
