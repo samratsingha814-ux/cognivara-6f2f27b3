@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Bell, Sparkles, Activity, Zap, Shield } from "lucide-react";
 import { DashboardResponse } from "@/services/cognivaraApi";

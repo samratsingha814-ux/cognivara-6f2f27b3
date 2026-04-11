@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Mic, Activity as WaveIcon, TrendingDown, BookText, Bell, Activity, Loader2, RefreshCw } from "lucide-react";
-import { getDashboard, DashboardResponse } from "@/services/cognivaraApi";
+import { Mic, Activity as WaveIcon, TrendingDown, BookText, Activity, Loader2, RefreshCw } from "lucide-react";
+import { DashboardResponse } from "@/services/cognivaraApi";
 
 interface DashboardScreenProps {
   dashboard: DashboardResponse | null;
@@ -9,7 +9,7 @@ interface DashboardScreenProps {
   onRefresh: () => void;
 }
 
-const DashboardScreen = ({ dashboard, userId, onRefresh }: DashboardScreenProps) => {
+const DashboardScreen = ({ dashboard, onRefresh }: DashboardScreenProps) => {
   const [loading, setLoading] = useState(false);
 
   const handleRefresh = async () => {
