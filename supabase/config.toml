@@ -1,1 +1,4 @@
 project_id = "dugtjejtuyouinnkazmt"
+
+[functions.cognivara-proxy]
+verify_jwt = false

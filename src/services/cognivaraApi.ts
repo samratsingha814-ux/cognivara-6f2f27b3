@@ -1,9 +1,14 @@
 /**
  * COGNIVARA API Service — Real Backend
- * All endpoints use the documented contract.
+ * All requests are proxied through an edge function to avoid CORS issues.
  */
 
-const BASE_URL = "https://cognivara-backend-service.onrender.com/api";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const PROXY_BASE = `${SUPABASE_URL}/functions/v1/cognivara-proxy`;
+
+function proxyUrl(path: string): string {
+  return `${PROXY_BASE}?path=${encodeURIComponent(path)}`;
+}
 
 // ─── Response Types ───
 
@@ -106,7 +111,7 @@ export function clearStoredUserId() {
 // ─── API Methods ───
 
 export async function checkHealth(): Promise<HealthResponse> {
-  const res = await fetch(`${BASE_URL}/health`);
+  const res = await fetch(proxyUrl("health"));
   if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
   return res.json();
 }
@@ -126,7 +131,7 @@ export async function createUser(data: {
   if (data.gender) formData.append("gender", data.gender);
   if (data.password) formData.append("password", data.password);
 
-  const res = await fetch(`${BASE_URL}/user`, {
+  const res = await fetch(proxyUrl("user"), {
     method: "POST",
     body: formData,
   });
@@ -152,7 +157,7 @@ export async function uploadSession(
   formData.append("audio", audioBlob, "recording.webm");
   if (transcript) formData.append("transcript", transcript);
 
-  const res = await fetch(`${BASE_URL}/upload`, {
+  const res = await fetch(proxyUrl("upload"), {
     method: "POST",
     body: formData,
   });
@@ -165,7 +170,7 @@ export async function uploadSession(
 
 /** GET /api/dashboard/{user_id} */
 export async function getDashboard(userId: string): Promise<DashboardResponse> {
-  const res = await fetch(`${BASE_URL}/dashboard/${userId}`);
+  const res = await fetch(proxyUrl(`dashboard/${userId}`));
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Dashboard fetch failed (${res.status}): ${text}`);
@@ -175,7 +180,7 @@ export async function getDashboard(userId: string): Promise<DashboardResponse> {
 
 /** GET /api/sessions/{user_id} */
 export async function getSessions(userId: string): Promise<SessionsResponse> {
-  const res = await fetch(`${BASE_URL}/sessions/${userId}`);
+  const res = await fetch(proxyUrl(`sessions/${userId}`));
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Sessions fetch failed (${res.status}): ${text}`);
@@ -185,7 +190,7 @@ export async function getSessions(userId: string): Promise<SessionsResponse> {
 
 /** POST /api/analyze — JSON body */
 export async function analyzeText(userId: string, text: string): Promise<AnalyzeResponse> {
-  const res = await fetch(`${BASE_URL}/analyze`, {
+  const res = await fetch(proxyUrl("analyze"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: Number(userId), text }),
