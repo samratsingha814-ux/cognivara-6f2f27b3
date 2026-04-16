@@ -1,9 +1,14 @@
 /**
  * COGNIVARA API Service — Real Backend
- * All endpoints use the documented contract.
+ * All requests are proxied through an edge function to avoid CORS issues.
  */
 
-const BASE_URL = "https://cognivara-backend-service.onrender.com/api";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const PROXY_BASE = `${SUPABASE_URL}/functions/v1/cognivara-proxy`;
+
+function proxyUrl(path: string): string {
+  return `${PROXY_BASE}?path=${encodeURIComponent(path)}`;
+}
 
 // ─── Response Types ───
 
