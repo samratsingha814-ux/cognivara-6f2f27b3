@@ -82,7 +82,7 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
         >
           <span className="font-heading text-6xl font-bold text-foreground">{score}</span>
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mt-2">CSI Score</p>
-          {dashboard.latest_risk_level && (
+          {typeof dashboard.latest_risk_level === "string" && (
             <p className={`text-xs font-semibold mt-2 uppercase tracking-wider ${
               dashboard.latest_risk_level === "low" ? "text-accent"
               : dashboard.latest_risk_level === "elevated" ? "text-destructive"
