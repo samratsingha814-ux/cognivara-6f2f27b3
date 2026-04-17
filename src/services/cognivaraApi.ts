@@ -150,11 +150,12 @@ export async function createUser(data: {
 export async function uploadSession(
   userId: string,
   audioBlob: Blob,
-  transcript: string = ""
+  transcript: string = "",
+  filename: string = "recording.webm"
 ): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("user_id", userId);
-  formData.append("audio", audioBlob, "recording.webm");
+  formData.append("audio", audioBlob, filename);
   if (transcript) formData.append("transcript", transcript);
 
   const res = await fetch(proxyUrl("upload"), {
