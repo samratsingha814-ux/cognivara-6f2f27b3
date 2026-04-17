@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import AppSidebar, { NavSection } from "@/components/AppSidebar";
 import TopBar from "@/components/TopBar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import HomeScreen from "@/components/HomeScreen";
 import RecordScreen from "@/components/RecordScreen";
 import DashboardScreen, { LatestUploadData } from "@/components/DashboardScreen";
@@ -109,7 +110,7 @@ const Index = () => {
     }
     switch (activeSection) {
       case "overview":
-        return <HomeScreen onStartRecording={handleStartRecording} dashboard={dashboard} sessionCount={sessionCount} />;
+        return <HomeScreen onStartRecording={handleStartRecording} dashboard={dashboard} latestUpload={latestUpload} sessionCount={sessionCount} />;
       case "voiceLabs":
         return <RecordScreen userId={cognivaraUserId} sessionCount={sessionCount} onSessionUploaded={handleSessionUploaded} />;
       case "reports":
@@ -138,34 +139,36 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <AppSidebar
-        activeSection={activeSection}
-        onSectionChange={(s) => { setActiveSection(s); setShowProfile(false); }}
-        onNewRecording={handleStartRecording}
-        onAccountClick={() => setShowProfile(true)}
-      />
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <TopBar
-          activeTab={topTab}
-          onTabChange={setTopTab}
-          onSync={handleRefreshDashboard}
+    <SidebarProvider>
+      <div className="min-h-screen bg-background flex w-full">
+        <AppSidebar
+          activeSection={activeSection}
+          onSectionChange={(s) => { setActiveSection(s); setShowProfile(false); }}
+          onNewRecording={handleStartRecording}
+          onAccountClick={() => setShowProfile(true)}
         />
-        <main className="flex-1 overflow-y-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={showProfile ? "profile" : activeSection}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15 }}
-            >
-              {renderContent()}
-            </motion.div>
-          </AnimatePresence>
-        </main>
+        <div className="flex-1 flex flex-col min-h-screen min-w-0">
+          <TopBar
+            activeTab={topTab}
+            onTabChange={setTopTab}
+            onSync={handleRefreshDashboard}
+          />
+          <main className="flex-1 overflow-y-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={showProfile ? "profile" : activeSection}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

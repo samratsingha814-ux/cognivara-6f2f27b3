@@ -1,18 +1,21 @@
 import { motion } from "framer-motion";
 import { Sparkles, Activity, Zap, Shield, Users, ArrowRight } from "lucide-react";
 import { DashboardResponse } from "@/services/cognivaraApi";
+import type { LatestUploadData } from "@/components/DashboardScreen";
 
 interface HomeScreenProps {
   onStartRecording: () => void;
   dashboard: DashboardResponse | null;
+  latestUpload?: LatestUploadData | null;
   sessionCount: number;
 }
 
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
-const HomeScreen = ({ onStartRecording, dashboard, sessionCount }: HomeScreenProps) => {
-  const cognitiveScore = dashboard?.latest_csi != null ? Math.round(dashboard.latest_csi) : 0;
-  const hasData = dashboard != null;
+const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount }: HomeScreenProps) => {
+  const csiRaw = dashboard?.latest_csi ?? latestUpload?.csi ?? null;
+  const cognitiveScore = csiRaw != null ? Math.round(csiRaw) : 0;
+  const hasData = csiRaw != null;
   const weeklyData = dashboard?.trends?.map((t) => t.csi) || [];
   const circumference = 2 * Math.PI * 70;
   const offset = circumference - (cognitiveScore / 100) * circumference;
@@ -20,10 +23,10 @@ const HomeScreen = ({ onStartRecording, dashboard, sessionCount }: HomeScreenPro
   const sessionsRemaining = Math.max(0, 3 - sessionCount);
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-heading text-3xl font-bold text-foreground">System Diagnostic</h1>
+        <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">System Diagnostic</h1>
         <div className="flex items-center gap-2 mt-1">
           <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
           <span className="text-xs text-muted-foreground">
@@ -33,7 +36,7 @@ const HomeScreen = ({ onStartRecording, dashboard, sessionCount }: HomeScreenPro
       </div>
 
       {/* Top Cards Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-6">
         {/* Morning Baseline / CSI Score Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -128,7 +131,7 @@ const HomeScreen = ({ onStartRecording, dashboard, sessionCount }: HomeScreenPro
       </div>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
         {/* Performance Trends */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
