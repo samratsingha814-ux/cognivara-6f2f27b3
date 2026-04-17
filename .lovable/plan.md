@@ -1,30 +1,23 @@
 
-The user wants two things:
+The Stress and Emotional Stability cards show `NaN%` because both `deriveStress` and `deriveEmotionalStability` in `src/services/cognivaraApi.ts` use `csi` directly in math (`(100 - csi) * 0.6 + ...` and `csi * 0.7 + ...`). When `csi` is `null` or `undefined` (which happens before baseline_ready, i.e. before 3 sessions), the early `return 0` only triggers on `csi == null`, but if `csi` is passed as `undefined` from `cards[meta.key]` chain it's fine — the real culprit is the `drift` math: `Object.values(drift).reduce(...) / Math.max(Object.keys(drift).length, 1)` returns `NaN` when drift values contain non-numbers, and `Math.abs(NaN)` stays `NaN`, poisoning the result.
 
-1. **Mobile-optimized layout / collapsible sidebar**: Convert the fixed `w-56` sidebar into a slide-in/out drawer using shadcn's Sidebar primitives (or a Sheet). On mobile it should be hidden by default with a hamburger trigger; on desktop it should be collapsible to an icon-rail. The main content should fill width without being awkwardly wide.
+Additionally, `mapFeaturesToCards` is called with `csi` that could be `null`, and the guard `if (csi == null) return 0` works — but in `DashboardScreen` the call is `mapFeaturesToCards(features, csi, drift)` where `drift` might be an object with nested non-numeric values from the backend, causing `reduce((a,b) => a+b)` to produce `NaN`.
 
-2. **Fix CSI score showing no result**: The CSI ring on HomeScreen / DashboardScreen isn't displaying a value. I need to check how CSI is currently being read. Looking at `Index.tsx`: `dashboard` only gets fetched after `baseline_ready` (3 sessions). Before that, `latestUpload.csi` exists but HomeScreen only receives `dashboard`. The pre-UI-redesign behavior likely showed the latest CSI from any upload. I'll wire `latestUpload.csi` as a fallback so the score shows after every recording, not just session 3+.
+## Fix
 
-## Plan
+Update `src/services/cognivaraApi.ts`:
 
-### 1. Responsive collapsible sidebar
-- Refactor `AppSidebar.tsx` to use shadcn `Sidebar` primitives (`Sidebar`, `SidebarProvider`, `SidebarTrigger`) with `collapsible="offcanvas"` on mobile and `collapsible="icon"` on desktop.
-- Wrap the app shell in `Index.tsx` with `SidebarProvider` and a `min-h-screen flex w-full` container.
-- Add a persistent `SidebarTrigger` (hamburger) inside `TopBar.tsx` so users can always slide the sidebar in/out.
-- Make `TopBar.tsx` mobile-friendly: hide the search/sub-tabs on small screens, keep only logo + trigger + sync + avatar.
-- Tighten main content padding for narrow viewports so the app feels phone-appropriate (`px-4 sm:px-6`), and let `HomeScreen`/`DashboardScreen` grids stack to single column on mobile (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3`).
+1. **`deriveStress`** and **`deriveEmotionalStability`**: sanitize drift values — filter to finite numbers only before reducing. Fall back to `0` when no valid drift entries exist. Wrap final result in `Number.isFinite()` check, return `0` if NaN.
 
-### 2. Fix CSI score on Home/Dashboard
-- In `Index.tsx`, pass `latestUpload` to `HomeScreen` as well.
-- In `HomeScreen.tsx`, compute the displayed CSI as `dashboard?.latest_csi ?? latestUpload?.csi ?? null` so the ring populates immediately after the first recording (matching pre-redesign behavior).
-- Same fallback in `DashboardScreen.tsx` for the headline CSI number.
-- If CSI is `null`, show a clear "Awaiting first recording" placeholder instead of an empty ring.
+2. Add a small `safeDriftMag(drift)` helper that:
+   - Returns `0` if drift is null/undefined/empty
+   - Filters `Object.values(drift)` to only finite numbers
+   - Returns `0` if no finite values remain
+   - Otherwise returns `Math.abs(sum / count)`
+
+3. Apply final `Number.isFinite(result) ? result : 0` guard in both derive functions.
 
 ### Files to change
-- `src/components/AppSidebar.tsx` — rewrite using shadcn Sidebar primitives, responsive collapsible.
-- `src/components/TopBar.tsx` — add `SidebarTrigger`, hide non-essential elements on mobile.
-- `src/pages/Index.tsx` — wrap in `SidebarProvider`, pass `latestUpload` to HomeScreen, tighten main padding.
-- `src/components/HomeScreen.tsx` — accept `latestUpload`, fall back CSI value, responsive grid.
-- `src/components/DashboardScreen.tsx` — same CSI fallback, responsive grid for biomarker cards.
+- `src/services/cognivaraApi.ts` — harden `deriveStress` and `deriveEmotionalStability` against non-numeric drift values and NaN propagation.
 
-No backend or API changes required.
+No UI or backend changes needed.
