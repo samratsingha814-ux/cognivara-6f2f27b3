@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Square, RotateCcw, Loader2, Activity, Lightbulb } from "lucide-react";
+import { Mic, Square, RotateCcw, Loader2, Lightbulb } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { convertAudioBlobToWav, getPreferredAudioMimeType } from "@/lib/audio";
 import { uploadSession, UploadResponse } from "@/services/cognivaraApi";
 
 interface RecordScreenProps {
@@ -23,25 +24,22 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
   const handleStart = useCallback(async () => {
     setUploadError("");
     audioChunksRef.current = [];
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const candidates = [
-        "audio/webm;codecs=opus",
-        "audio/ogg;codecs=opus",
-        "audio/mp4",
-        "audio/webm",
-      ];
-      const mimeType =
-        candidates.find((t) => (window as any).MediaRecorder?.isTypeSupported?.(t)) || "";
+      const mimeType = getPreferredAudioMimeType();
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
       mediaRecorderRef.current = recorder;
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
       recorder.start(250);
     } catch {
-      console.warn("Could not start media recorder");
+      setUploadError("Microphone access failed. Please check browser permissions and try again.");
+      return;
     }
+
     startRecording();
   }, [startRecording]);
 
@@ -49,25 +47,26 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
     stopRecording();
     const recorder = mediaRecorderRef.current;
     const recordedMime = recorder?.mimeType || "audio/webm";
-    let audioBlob = new Blob([], { type: recordedMime });
+    let recordedBlob = new Blob([], { type: recordedMime });
+
     if (recorder && recorder.state !== "inactive") {
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();
         recorder.stop();
       });
+
       if (audioChunksRef.current.length > 0) {
-        audioBlob = new Blob(audioChunksRef.current, { type: recordedMime });
+        recordedBlob = new Blob(audioChunksRef.current, { type: recordedMime });
       }
-      recorder.stream.getTracks().forEach((t) => t.stop());
+
+      recorder.stream.getTracks().forEach((track) => track.stop());
     }
-    const ext = recordedMime.includes("ogg")
-      ? "ogg"
-      : recordedMime.includes("mp4")
-        ? "m4a"
-        : "webm";
+
     setIsUploading(true);
+
     try {
-      const result = await uploadSession(userId, audioBlob, transcript || "", `recording.${ext}`);
+      const wavBlob = await convertAudioBlobToWav(recordedBlob);
+      const result = await uploadSession(userId, wavBlob, transcript || "", "recording.wav");
       onSessionUploaded(result);
     } catch (err: any) {
       setUploadError(err.message || "Upload failed");
@@ -87,31 +86,24 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
 
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="mb-6">
         <h1 className="font-heading text-3xl font-bold text-foreground">Voice Biomarkers</h1>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="mt-1 flex items-center gap-2">
           <div className={`h-2 w-2 rounded-full ${isRecording ? "bg-amber-400 animate-pulse" : "bg-muted-foreground"}`} />
-          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">
+          <span className="font-semibold text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             {isRecording ? "Session Live: Capturing Neural Patterns" : `Session ${currentSessionNum} of 3 · Ready`}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Recording Area */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <motion.div
-            className="rounded-2xl bg-gradient-card border border-border p-8 shadow-card flex flex-col items-center"
-          >
-            {/* Mic Icon */}
+          <motion.div className="flex flex-col items-center rounded-2xl border border-border bg-gradient-card p-8 shadow-card">
             <motion.div
               animate={isRecording ? { scale: [1, 1.05, 1] } : {}}
               transition={{ repeat: Infinity, duration: 2 }}
-              className={`h-24 w-24 rounded-2xl flex items-center justify-center mb-6 transition-all ${
-                isRecording
-                  ? "bg-primary/20 border-2 border-primary shadow-glow"
-                  : "bg-secondary"
+              className={`mb-6 flex h-24 w-24 items-center justify-center rounded-2xl transition-all ${
+                isRecording ? "border-2 border-primary bg-primary/20 shadow-glow" : "bg-secondary"
               }`}
             >
               {isUploading ? (
@@ -121,33 +113,30 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
               )}
             </motion.div>
 
-            {/* Timer */}
-            <p className="font-heading text-6xl font-bold text-foreground tabular-nums mb-2">
+            <p className="mb-2 font-heading text-6xl font-bold tabular-nums text-foreground">
               {minutes.toString().padStart(2, "0")}:{seconds.toString().padStart(2, "0")}
-              <span className="text-lg text-muted-foreground ml-1">/{timeLeft}</span>
+              <span className="ml-1 text-lg text-muted-foreground">/{timeLeft}</span>
             </p>
 
-            {/* Waveform visualization */}
             {isRecording && (
-              <div className="flex items-end gap-1 h-12 mb-4">
-                {Array.from({ length: 20 }).map((_, i) => (
+              <div className="mb-4 flex h-12 items-end gap-1">
+                {Array.from({ length: 20 }).map((_, index) => (
                   <motion.div
-                    key={i}
+                    key={index}
                     className="w-1.5 rounded-full bg-primary/60"
                     animate={{ height: [4, Math.random() * 40 + 8, 4] }}
-                    transition={{ repeat: Infinity, duration: 0.6 + Math.random() * 0.4, delay: i * 0.05 }}
+                    transition={{ repeat: Infinity, duration: 0.6 + Math.random() * 0.4, delay: index * 0.05 }}
                   />
                 ))}
               </div>
             )}
 
-            {/* Record/Stop Button */}
             <button
               onClick={isRecording ? handleStop : handleStart}
               disabled={isUploading}
-              className={`flex items-center gap-3 px-8 py-3.5 rounded-xl font-heading font-semibold text-sm transition-all ${
+              className={`flex items-center gap-3 rounded-xl px-8 py-3.5 font-heading text-sm font-semibold transition-all ${
                 isRecording
-                  ? "bg-destructive/20 text-destructive border border-destructive/30 hover:bg-destructive/30"
+                  ? "border border-destructive/30 bg-destructive/20 text-destructive hover:bg-destructive/30"
                   : isUploading
                     ? "bg-muted text-muted-foreground"
                     : "bg-gradient-cta text-primary-foreground shadow-glow hover:opacity-90"
@@ -168,21 +157,20 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
               )}
             </button>
 
-            {uploadError && <p className="text-sm text-destructive mt-4">{uploadError}</p>}
+            {uploadError && <p className="mt-4 text-sm text-destructive">{uploadError}</p>}
 
-            {/* Transcript */}
             <AnimatePresence>
               {(transcript || interimTranscript) && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="w-full rounded-xl bg-secondary/50 border border-border p-4 mt-6"
+                  className="mt-6 w-full rounded-xl border border-border bg-secondary/50 p-4"
                 >
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+                  <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Live Transcript
                   </p>
-                  <p className="text-sm text-foreground leading-relaxed">
+                  <p className="text-sm leading-relaxed text-foreground">
                     {transcript}
                     <span className="text-muted-foreground">{interimTranscript}</span>
                   </p>
@@ -191,68 +179,81 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
             </AnimatePresence>
 
             {transcript && !isRecording && !isUploading && (
-              <button onClick={handleReset} className="flex items-center gap-2 mt-3 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <button
+                onClick={handleReset}
+                className="mt-3 flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
                 <RotateCcw className="h-3 w-3" /> Reset
               </button>
             )}
           </motion.div>
 
-          {/* Real-time Metrics */}
-          <div className="grid grid-cols-4 gap-3 mt-5">
+          <div className="mt-5 grid grid-cols-4 gap-3">
             {[
               { label: "PITCH RANGE", value: isRecording ? "142" : "--", unit: "Hz", color: "bg-primary" },
               { label: "JITTER INDEX", value: isRecording ? "0.42" : "--", unit: "%", color: "bg-primary" },
               { label: "LATENCY", value: isRecording ? "12" : "--", unit: "ms", color: "bg-accent" },
               { label: "VAD STATUS", value: isRecording ? "ACTIVE" : "IDLE", unit: "", color: "" },
             ].map((metric) => (
-              <div key={metric.label} className="rounded-xl bg-gradient-card border border-border p-4 shadow-card">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-3">{metric.label}</p>
+              <div key={metric.label} className="rounded-xl border border-border bg-gradient-card p-4 shadow-card">
+                <p className="mb-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{metric.label}</p>
                 <p className="font-heading text-2xl font-bold text-foreground">
                   {metric.value}
-                  {metric.unit && <span className="text-xs text-muted-foreground ml-1 font-normal">{metric.unit}</span>}
+                  {metric.unit && <span className="ml-1 text-xs font-normal text-muted-foreground">{metric.unit}</span>}
                 </p>
-                {metric.color && (
-                  <div className={`h-1 rounded-full mt-2 ${metric.color}`} style={{ width: "60%" }} />
-                )}
+                {metric.color && <div className={`mt-2 h-1 rounded-full ${metric.color}`} style={{ width: "60%" }} />}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Right Column: Tips */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="mb-2 flex items-center gap-2">
             <Lightbulb className="h-4 w-4 text-primary" />
             <h3 className="font-heading text-base font-bold text-foreground">Tips for Accuracy</h3>
           </div>
 
           {[
-            { title: "ENVIRONMENT", desc: "Ensure a quiet clinical setting. Minimize ambient hum from HVAC or electronic equipment.", color: "border-accent" },
-            { title: "DISTANCE", desc: "Maintain a consistent distance of 15-20cm between the patient and the microphone sensor.", color: "border-destructive" },
-            { title: "ARTICULATION", desc: "Ask the patient to speak at their natural conversational volume without forced projection.", color: "border-destructive" },
+            {
+              title: "ENVIRONMENT",
+              desc: "Ensure a quiet clinical setting. Minimize ambient hum from HVAC or electronic equipment.",
+              color: "border-accent",
+            },
+            {
+              title: "DISTANCE",
+              desc: "Maintain a consistent distance of 15-20cm between the patient and the microphone sensor.",
+              color: "border-destructive",
+            },
+            {
+              title: "ARTICULATION",
+              desc: "Ask the patient to speak at their natural conversational volume without forced projection.",
+              color: "border-destructive",
+            },
           ].map((tip) => (
-            <div key={tip.title} className={`rounded-xl bg-card border-l-2 ${tip.color} border border-border p-4`}>
-              <p className={`text-[10px] uppercase tracking-wider font-semibold mb-2 ${
-                tip.color === "border-accent" ? "text-accent" : "text-destructive"
-              }`}>
+            <div key={tip.title} className={`rounded-xl border border-border border-l-2 ${tip.color} bg-card p-4`}>
+              <p
+                className={`mb-2 text-[10px] font-semibold uppercase tracking-wider ${
+                  tip.color === "border-accent" ? "text-accent" : "text-destructive"
+                }`}
+              >
                 {tip.title}
               </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">{tip.desc}</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">{tip.desc}</p>
             </div>
           ))}
 
-          <div className="rounded-xl bg-gradient-card border border-border p-4 mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Processing Node</p>
+          <div className="mt-4 rounded-xl border border-border bg-gradient-card p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Processing Node</p>
               <span className="text-[10px] font-semibold text-primary">US-EAST-01</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-accent" />
-              <span className="text-xs text-foreground font-medium">Neural Engine Sync: Optimized</span>
+              <span className="text-xs font-medium text-foreground">Neural Engine Sync: Optimized</span>
             </div>
           </div>
 
-          <p className="text-[9px] uppercase tracking-wider text-muted-foreground leading-relaxed mt-4">
+          <p className="mt-4 text-[9px] uppercase tracking-wider leading-relaxed text-muted-foreground">
             This recording is protected by AES-256 neural encryption. End-to-end clinical compliance active.
           </p>
         </div>
