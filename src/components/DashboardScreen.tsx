@@ -59,7 +59,7 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
   const score = csi != null ? Math.round(csi) : 0;
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
