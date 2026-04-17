@@ -82,7 +82,7 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
         >
           <span className="font-heading text-6xl font-bold text-foreground">{score}</span>
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mt-2">CSI Score</p>
-          {dashboard.latest_risk_level && (
+          {typeof dashboard.latest_risk_level === "string" && (
             <p className={`text-xs font-semibold mt-2 uppercase tracking-wider ${
               dashboard.latest_risk_level === "low" ? "text-accent"
               : dashboard.latest_risk_level === "elevated" ? "text-destructive"
@@ -93,34 +93,38 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
           )}
         </motion.div>
 
-        {dashboard.flagged_features && dashboard.flagged_features.length > 0 && (
+        {Array.isArray(dashboard.flagged_features) && dashboard.flagged_features.length > 0 && (
           <div className="rounded-2xl bg-destructive/10 border border-destructive/30 p-5">
             <p className="text-xs font-semibold text-destructive uppercase tracking-wider mb-3">Flagged Features</p>
             <div className="flex flex-wrap gap-2">
-              {dashboard.flagged_features.map((f) => (
-                <span key={f} className="text-xs bg-destructive/20 text-destructive px-2.5 py-1 rounded-lg">
-                  {f.replace(/_/g, " ")}
-                </span>
-              ))}
+              {dashboard.flagged_features
+                .filter((f): f is string => typeof f === "string")
+                .map((f) => (
+                  <span key={f} className="text-xs bg-destructive/20 text-destructive px-2.5 py-1 rounded-lg">
+                    {f.replace(/_/g, " ")}
+                  </span>
+                ))}
             </div>
           </div>
         )}
 
         {/* Trends mini */}
-        {dashboard.trends && dashboard.trends.length > 0 && (
+        {Array.isArray(dashboard.trends) && dashboard.trends.length > 0 && (
           <div className="rounded-2xl bg-gradient-card border border-border p-5 shadow-card">
             <h3 className="font-heading text-sm font-semibold text-foreground mb-3">CSI Trends</h3>
             <div className="flex items-end justify-between gap-2 h-24">
               {dashboard.trends.map((t, i) => {
                 const isLatest = i === dashboard.trends.length - 1;
+                const csiVal = typeof t?.csi === "number" ? t.csi : 0;
+                const sessionNum = typeof t?.session_number === "number" || typeof t?.session_number === "string" ? t.session_number : i + 1;
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
                     <div className="w-full flex justify-center">
                       <div className={`w-4 rounded-t-md ${isLatest ? "bg-primary" : "bg-secondary"}`}
-                        style={{ height: `${((t.csi ?? 0) / 100) * 70}px` }}
+                        style={{ height: `${(csiVal / 100) * 70}px` }}
                       />
                     </div>
-                    <span className="text-[9px] text-muted-foreground font-medium">S{t.session_number}</span>
+                    <span className="text-[9px] text-muted-foreground font-medium">S{sessionNum}</span>
                   </div>
                 );
               })}

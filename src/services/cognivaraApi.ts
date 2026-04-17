@@ -209,8 +209,11 @@ export async function analyzeText(userId: string, text: string): Promise<Analyze
  * Map 30 raw backend features into 6 UI cards.
  * Accepts merged acoustic + temporal + linguistic features.
  */
-export function mapFeaturesToCards(features: Record<string, number>, csi?: number | null, drift?: Record<string, number> | null) {
-  const safe = (key: string) => features[key] ?? null;
+export function mapFeaturesToCards(features: Record<string, unknown>, csi?: number | null, drift?: Record<string, number> | null) {
+  const safe = (key: string): number | null => {
+    const v = features?.[key];
+    return typeof v === "number" && Number.isFinite(v) ? v : null;
+  };
 
   return {
     stress: deriveStress(csi, drift),
