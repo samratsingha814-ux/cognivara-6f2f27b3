@@ -225,11 +225,19 @@ export function mapFeaturesToCards(features: Record<string, unknown>, csi?: numb
   };
 }
 
+function safeDriftMag(drift?: Record<string, number> | null): number {
+  if (!drift || typeof drift !== "object") return 0;
+  const finite = Object.values(drift).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  if (finite.length === 0) return 0;
+  const mag = Math.abs(finite.reduce((a, b) => a + b, 0) / finite.length);
+  return Number.isFinite(mag) ? mag : 0;
+}
+
 function deriveStress(csi?: number | null, drift?: Record<string, number> | null): number {
-  if (csi == null) return 0;
-  // Higher CSI = lower stress; invert and scale
-  const driftMag = drift ? Math.abs(Object.values(drift).reduce((a, b) => a + b, 0) / Math.max(Object.keys(drift).length, 1)) : 0;
-  return Math.round(Math.min(100, Math.max(0, (100 - csi) * 0.6 + driftMag * 40)));
+  if (csi == null || !Number.isFinite(csi)) return 0;
+  const driftMag = safeDriftMag(drift);
+  const result = Math.round(Math.min(100, Math.max(0, (100 - csi) * 0.6 + driftMag * 40)));
+  return Number.isFinite(result) ? result : 0;
 }
 
 function derivePitch(mean: number | null, variance: number | null): number {
