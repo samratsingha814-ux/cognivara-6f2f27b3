@@ -275,8 +275,8 @@ function deriveFluency(rate: number | null, ratio: number | null, rhythm: number
 }
 
 function deriveEmotionalStability(csi?: number | null, drift?: Record<string, number> | null): number {
-  if (csi == null) return 0;
-  const driftMag = drift ? Math.abs(Object.values(drift).reduce((a, b) => a + b, 0) / Math.max(Object.keys(drift).length, 1)) : 0;
-  // High CSI + low drift = high stability
-  return Math.round(Math.min(100, Math.max(0, csi * 0.7 + (1 - Math.min(1, driftMag)) * 30)));
+  if (csi == null || !Number.isFinite(csi)) return 0;
+  const driftMag = safeDriftMag(drift);
+  const result = Math.round(Math.min(100, Math.max(0, csi * 0.7 + (1 - Math.min(1, driftMag)) * 30)));
+  return Number.isFinite(result) ? result : 0;
 }
