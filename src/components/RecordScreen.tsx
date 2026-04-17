@@ -25,7 +25,15 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
     audioChunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const candidates = [
+        "audio/webm;codecs=opus",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+        "audio/webm",
+      ];
+      const mimeType =
+        candidates.find((t) => (window as any).MediaRecorder?.isTypeSupported?.(t)) || "";
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
@@ -40,20 +48,26 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
   const handleStop = useCallback(async () => {
     stopRecording();
     const recorder = mediaRecorderRef.current;
-    let audioBlob = new Blob([], { type: "audio/webm" });
+    const recordedMime = recorder?.mimeType || "audio/webm";
+    let audioBlob = new Blob([], { type: recordedMime });
     if (recorder && recorder.state !== "inactive") {
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();
         recorder.stop();
       });
       if (audioChunksRef.current.length > 0) {
-        audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        audioBlob = new Blob(audioChunksRef.current, { type: recordedMime });
       }
       recorder.stream.getTracks().forEach((t) => t.stop());
     }
+    const ext = recordedMime.includes("ogg")
+      ? "ogg"
+      : recordedMime.includes("mp4")
+        ? "m4a"
+        : "webm";
     setIsUploading(true);
     try {
-      const result = await uploadSession(userId, audioBlob, transcript || "");
+      const result = await uploadSession(userId, audioBlob, transcript || "", `recording.${ext}`);
       onSessionUploaded(result);
     } catch (err: any) {
       setUploadError(err.message || "Upload failed");
