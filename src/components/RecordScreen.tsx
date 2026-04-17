@@ -48,20 +48,26 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
   const handleStop = useCallback(async () => {
     stopRecording();
     const recorder = mediaRecorderRef.current;
-    let audioBlob = new Blob([], { type: "audio/webm" });
+    const recordedMime = recorder?.mimeType || "audio/webm";
+    let audioBlob = new Blob([], { type: recordedMime });
     if (recorder && recorder.state !== "inactive") {
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();
         recorder.stop();
       });
       if (audioChunksRef.current.length > 0) {
-        audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        audioBlob = new Blob(audioChunksRef.current, { type: recordedMime });
       }
       recorder.stream.getTracks().forEach((t) => t.stop());
     }
+    const ext = recordedMime.includes("ogg")
+      ? "ogg"
+      : recordedMime.includes("mp4")
+        ? "m4a"
+        : "webm";
     setIsUploading(true);
     try {
-      const result = await uploadSession(userId, audioBlob, transcript || "");
+      const result = await uploadSession(userId, audioBlob, transcript || "", `recording.${ext}`);
       onSessionUploaded(result);
     } catch (err: any) {
       setUploadError(err.message || "Upload failed");
