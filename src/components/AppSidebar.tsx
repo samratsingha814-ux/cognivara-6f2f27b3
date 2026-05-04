@@ -25,6 +25,7 @@ const NAV_ITEMS: { id: NavSection; label: string; icon: typeof LayoutDashboard }
   { id: "overview", label: "Cognitive Overview", icon: LayoutDashboard },
   { id: "voiceLabs", label: "Voice Labs", icon: AudioLines },
   { id: "reports", label: "Clinical Reports", icon: FileBarChart },
+  { id: "history", label: "Recording History", icon: History },
   { id: "patients", label: "Patient Data", icon: Users },
   { id: "health", label: "System Health", icon: HeartPulse },
 ];
