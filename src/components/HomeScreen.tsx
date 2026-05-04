@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles, Activity, Zap, Shield, Users, ArrowRight } from "lucide-react";
-import { DashboardResponse } from "@/services/cognivaraApi";
+import { DashboardResponse, getCsiScore, getRiskLevel } from "@/services/cognivaraApi";
 import type { LatestUploadData } from "@/components/DashboardScreen";
 
 interface HomeScreenProps {
@@ -8,20 +8,22 @@ interface HomeScreenProps {
   dashboard: DashboardResponse | null;
   latestUpload?: LatestUploadData | null;
   sessionCount: number;
+  recordingsCompleted: number;
 }
 
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
-const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount }: HomeScreenProps) => {
-  const baselineReady = dashboard?.baseline_ready === true;
-  const csiRaw = baselineReady ? (dashboard?.latest_csi ?? null) : null;
+const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, recordingsCompleted }: HomeScreenProps) => {
+  const baselineReady = recordingsCompleted >= 3;
+  const csiRaw = baselineReady ? (latestUpload?.csi ?? getCsiScore(dashboard?.latest_csi)) : null;
   const cognitiveScore = csiRaw != null ? Math.round(csiRaw) : 0;
   const hasData = baselineReady && csiRaw != null;
   const weeklyData = dashboard?.trends?.map((t) => t.csi) || [];
   const circumference = 2 * Math.PI * 70;
   const offset = circumference - (cognitiveScore / 100) * circumference;
   const scoreLabel = cognitiveScore >= 70 ? "OPTIMAL" : cognitiveScore >= 40 ? "MODERATE" : "LOW";
-  const sessionsRemaining = Math.max(0, 3 - sessionCount);
+  const sessionsRemaining = Math.max(0, 3 - recordingsCompleted);
+  const riskLevel = getRiskLevel(latestUpload?.csi ?? null, dashboard?.latest_risk_level);
 
   return (
     <div className="p-4 sm:p-6">
@@ -78,7 +80,7 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount }:
                 <div className="text-center">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stability</p>
                   <p className="font-heading text-lg font-bold text-foreground">
-                    {dashboard?.latest_risk_level === "low" ? "+4.2%" : "-1.8%"}
+                    {riskLevel === "low" ? "+4.2%" : "-1.8%"}
                   </p>
                 </div>
                 <div className="text-center">
@@ -92,7 +94,7 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount }:
               <p className="text-sm text-muted-foreground">
                 Complete {sessionsRemaining} more recording{sessionsRemaining !== 1 ? "s" : ""} to unlock analysis.
               </p>
-              <p className="text-xs text-muted-foreground mt-2">{sessionCount}/3 sessions recorded</p>
+              <p className="text-xs text-muted-foreground mt-2">{recordingsCompleted}/3 sessions recorded</p>
             </div>
           )}
         </motion.div>

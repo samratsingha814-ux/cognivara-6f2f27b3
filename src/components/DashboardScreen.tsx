@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Mic, Activity as WaveIcon, TrendingDown, BookText, Brain, Heart, Activity, Loader2, RefreshCw } from "lucide-react";
-import { DashboardResponse, mapFeaturesToCards } from "@/services/cognivaraApi";
+import { DashboardResponse, getCsiScore, getRiskLevel, mapFeaturesToCards } from "@/services/cognivaraApi";
 
 interface DashboardScreenProps {
   dashboard: DashboardResponse | null;
   latestUpload: LatestUploadData | null;
+  recordingsCompleted: number;
   onRefresh: () => void;
 }
 
 export interface LatestUploadData {
   csi: number | null;
-  drift: Record<string, number> | null;
+  riskLevel: string | null;
+  drift: Record<string, unknown> | null;
   features: Record<string, number>;
 }
 
@@ -24,7 +26,7 @@ const CARD_META = [
   { key: "emotionalStability", label: "Emotional Stability", subtitle: "Overall stability index", icon: Heart, color: "hsl(210, 90%, 55%)" },
 ] as const;
 
-const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreenProps) => {
+const DashboardScreen = ({ dashboard, latestUpload, recordingsCompleted, onRefresh }: DashboardScreenProps) => {
   const [loading, setLoading] = useState(false);
 
   const handleRefresh = async () => {
@@ -33,20 +35,28 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
     setLoading(false);
   };
 
-  const baselineReady = dashboard?.baseline_ready === true;
+  const baselineReady = recordingsCompleted >= 3;
   const features = latestUpload?.features || dashboard?.feature_summary || {};
-  const csi = baselineReady ? (dashboard?.latest_csi ?? null) : null;
+  const csi = baselineReady ? (latestUpload?.csi ?? getCsiScore(dashboard?.latest_csi)) : null;
   const drift = baselineReady ? (latestUpload?.drift ?? null) : null;
+  const riskLevel = baselineReady ? (latestUpload?.riskLevel ?? getRiskLevel(null, dashboard?.latest_risk_level)) : null;
   const cards = mapFeaturesToCards(features, csi, drift);
+  const score = csi != null ? Math.round(csi) : 0;
 
-  if (!dashboard) {
+  if (!baselineReady) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[60vh]">
         <WaveIcon className="h-12 w-12 text-muted-foreground mb-4" />
-        <h2 className="font-heading text-xl font-bold mb-2">No Insights Yet</h2>
+        <h2 className="font-heading text-xl font-bold mb-2">Calibration in Progress</h2>
         <p className="text-sm text-muted-foreground text-center mb-6">
-          Complete 3 voice recordings to unlock your neural analysis.
+          Complete 3 voice recordings before IM Voice Labs shows any results.
         </p>
+        <div className="w-full max-w-sm mb-6">
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (recordingsCompleted / 3) * 100)}%` }} />
+          </div>
+          <p className="text-xs text-center text-muted-foreground mt-2">{recordingsCompleted}/3 recordings complete</p>
+        </div>
         <button onClick={handleRefresh} disabled={loading}
           className="flex items-center gap-2 py-3 px-6 rounded-xl bg-gradient-cta text-primary-foreground font-heading font-semibold text-sm"
         >
@@ -56,8 +66,6 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
       </div>
     );
   }
-
-  const score = csi != null ? Math.round(csi) : 0;
 
   return (
     <div className="p-4 sm:p-6">
@@ -83,13 +91,13 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
         >
           <span className="font-heading text-6xl font-bold text-foreground">{score}</span>
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mt-2">CSI Score</p>
-          {typeof dashboard.latest_risk_level === "string" && (
+          {typeof riskLevel === "string" && (
             <p className={`text-xs font-semibold mt-2 uppercase tracking-wider ${
-              dashboard.latest_risk_level === "low" ? "text-accent"
-              : dashboard.latest_risk_level === "elevated" ? "text-destructive"
+              riskLevel === "low" ? "text-accent"
+              : riskLevel === "elevated" ? "text-destructive"
               : "text-yellow-400"
             }`}>
-              Risk: {dashboard.latest_risk_level}
+              Risk: {riskLevel}
             </p>
           )}
         </motion.div>
