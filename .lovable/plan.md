@@ -1,23 +1,18 @@
 
-The Stress and Emotional Stability cards show `NaN%` because both `deriveStress` and `deriveEmotionalStability` in `src/services/cognivaraApi.ts` use `csi` directly in math (`(100 - csi) * 0.6 + ...` and `csi * 0.7 + ...`). When `csi` is `null` or `undefined` (which happens before baseline_ready, i.e. before 3 sessions), the early `return 0` only triggers on `csi == null`, but if `csi` is passed as `undefined` from `cards[meta.key]` chain it's fine — the real culprit is the `drift` math: `Object.values(drift).reduce(...) / Math.max(Object.keys(drift).length, 1)` returns `NaN` when drift values contain non-numbers, and `Math.abs(NaN)` stays `NaN`, poisoning the result.
+Two changes:
 
-Additionally, `mapFeaturesToCards` is called with `csi` that could be `null`, and the guard `if (csi == null) return 0` works — but in `DashboardScreen` the call is `mapFeaturesToCards(features, csi, drift)` where `drift` might be an object with nested non-numeric values from the backend, causing `reduce((a,b) => a+b)` to produce `NaN`.
+1. **Enforce 3 recordings before showing CSI/dashboard insights**: Currently after 1 recording, `latestUpload.csi` falls back into HomeScreen/DashboardScreen and shows a score. Backend only sets `baseline_ready=true` after 3 sessions and returns `csi: null` until then — but we should also gate the UI explicitly so users see calibration progress (e.g. "1/3", "2/3") rather than a pre-baseline score that may briefly appear. Remove the `latestUpload.csi` fallback in HomeScreen/DashboardScreen so CSI only shows once `dashboard.baseline_ready` is true. Show a clear "X of 3 recordings complete" calibration card instead.
 
-## Fix
+2. **Recording history view**: Add a new "History" screen that calls `getSessions(userId)` and lists each past session with: session number, date, transcript snippet, CSI score (if available), and a few key features. Add it to the bottom nav / sidebar.
 
-Update `src/services/cognivaraApi.ts`:
-
-1. **`deriveStress`** and **`deriveEmotionalStability`**: sanitize drift values — filter to finite numbers only before reducing. Fall back to `0` when no valid drift entries exist. Wrap final result in `Number.isFinite()` check, return `0` if NaN.
-
-2. Add a small `safeDriftMag(drift)` helper that:
-   - Returns `0` if drift is null/undefined/empty
-   - Filters `Object.values(drift)` to only finite numbers
-   - Returns `0` if no finite values remain
-   - Otherwise returns `Math.abs(sum / count)`
-
-3. Apply final `Number.isFinite(result) ? result : 0` guard in both derive functions.
+## Plan
 
 ### Files to change
-- `src/services/cognivaraApi.ts` — harden `deriveStress` and `deriveEmotionalStability` against non-numeric drift values and NaN propagation.
+- `src/components/HomeScreen.tsx` — remove `latestUpload.csi` fallback for the score; only show CSI when `dashboard?.baseline_ready` is true. Otherwise show calibration progress (`session_count / 3`).
+- `src/components/DashboardScreen.tsx` — same: gate CSI display behind `baseline_ready`. Show calibration prompt with progress bar otherwise.
+- `src/components/HistoryScreen.tsx` — **new file**. Fetches sessions via `getSessions(userId)`, lists them in cards with session #, date, CSI badge, transcript preview, expandable feature details.
+- `src/components/BottomNav.tsx` — add "History" tab (icon: `History` from lucide).
+- `src/components/AppSidebar.tsx` — add "History" nav item.
+- `src/pages/Index.tsx` — add `"history"` to active tab union, render `<HistoryScreen userId={userId} />` when active.
 
-No UI or backend changes needed.
+No backend / DB changes — `getSessions` endpoint already exists in `cognivaraApi.ts`.
