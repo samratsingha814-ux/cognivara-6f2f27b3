@@ -12,7 +12,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-export type NavSection = "overview" | "voiceLabs" | "reports" | "patients" | "health";
+export type NavSection = "overview" | "voiceLabs" | "reports" | "history" | "patients" | "health";
 
 interface AppSidebarProps {
   activeSection: NavSection;
