@@ -13,7 +13,7 @@ import Auth from "@/pages/Auth";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getStoredUserId, setStoredUserId, checkHealth,
-  getDashboard, DashboardResponse, UploadResponse,
+  getDashboard, DashboardResponse, UploadResponse, getCsiScore, getRiskLevel,
 } from "@/services/cognivaraApi";
 import { Loader2 } from "lucide-react";
 
@@ -22,6 +22,7 @@ const Index = () => {
   const [activeSection, setActiveSection] = useState<NavSection>("overview");
   const [topTab, setTopTab] = useState<"dashboard" | "analytics" | "patients">("dashboard");
   const [sessionCount, setSessionCount] = useState(0);
+  const [recordingsCompleted, setRecordingsCompleted] = useState(0);
   const [cognivaraUserId, setCognivaraUserId] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [latestUpload, setLatestUpload] = useState<LatestUploadData | null>(null);
@@ -46,6 +47,7 @@ const Index = () => {
   const handleSessionUploaded = useCallback(async (result: UploadResponse) => {
     const newCount = result.user_total_sessions ?? sessionCount + 1;
     setSessionCount(newCount);
+    setRecordingsCompleted((count) => Math.min(3, count + 1));
 
     const mergedFeatures = {
       ...(result.acoustic_features || {}),
@@ -53,12 +55,13 @@ const Index = () => {
       ...(result.linguistic_features || {}),
     };
     setLatestUpload({
-      csi: result.csi,
+      csi: getCsiScore(result.csi, result.user_latest_csi_score),
+      riskLevel: getRiskLevel(result.csi, null),
       drift: result.drift,
       features: mergedFeatures,
     });
 
-    if (result.baseline_ready && cognivaraUserId) {
+    if (recordingsCompleted + 1 >= 3 && cognivaraUserId) {
       try {
         const data = await getDashboard(cognivaraUserId);
         setDashboard(data);
@@ -68,7 +71,7 @@ const Index = () => {
         setActiveSection("reports");
       }
     }
-  }, [sessionCount, cognivaraUserId]);
+  }, [sessionCount, cognivaraUserId, recordingsCompleted]);
 
   const handleStartRecording = () => {
     setActiveSection("voiceLabs");
@@ -111,11 +114,11 @@ const Index = () => {
     }
     switch (activeSection) {
       case "overview":
-        return <HomeScreen onStartRecording={handleStartRecording} dashboard={dashboard} latestUpload={latestUpload} sessionCount={sessionCount} />;
+        return <HomeScreen onStartRecording={handleStartRecording} dashboard={dashboard} latestUpload={latestUpload} sessionCount={sessionCount} recordingsCompleted={recordingsCompleted} />;
       case "voiceLabs":
-        return <RecordScreen userId={cognivaraUserId} sessionCount={sessionCount} onSessionUploaded={handleSessionUploaded} />;
+        return <RecordScreen userId={cognivaraUserId} sessionCount={recordingsCompleted} onSessionUploaded={handleSessionUploaded} />;
       case "reports":
-        return <DashboardScreen dashboard={dashboard} latestUpload={latestUpload} onRefresh={handleRefreshDashboard} />;
+        return <DashboardScreen dashboard={dashboard} latestUpload={latestUpload} recordingsCompleted={recordingsCompleted} onRefresh={handleRefreshDashboard} />;
       case "history":
         return <HistoryScreen userId={cognivaraUserId} />;
       case "patients":
