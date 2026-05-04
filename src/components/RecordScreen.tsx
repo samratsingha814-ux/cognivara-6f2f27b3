@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, Square, RotateCcw, Loader2, Lightbulb } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { convertAudioBlobToWav, getPreferredAudioMimeType } from "@/lib/audio";
-import { uploadSession, UploadResponse } from "@/services/cognivaraApi";
+import { uploadSession, warmupBackend, UploadResponse } from "@/services/cognivaraApi";
 
 interface RecordScreenProps {
   userId: string;
