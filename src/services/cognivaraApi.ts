@@ -241,12 +241,34 @@ export function mapFeaturesToCards(features: Record<string, unknown>, csi?: numb
   };
 }
 
-function safeDriftMag(drift?: Record<string, number> | null): number {
+function safeDriftMag(drift?: Record<string, unknown> | null): number {
   if (!drift || typeof drift !== "object") return 0;
-  const finite = Object.values(drift).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const d = drift as Record<string, unknown>;
+
+  // Backend shape: { per_feature: {...}, overall_drift_score: number, ... }
+  if (typeof d.overall_drift_score === "number" && Number.isFinite(d.overall_drift_score)) {
+    return Math.min(1, Math.abs(d.overall_drift_score as number));
+  }
+
+  // Fallback: average |current_z| across per_feature entries
+  const perFeature = d.per_feature as Record<string, { current_z?: unknown }> | undefined;
+  if (perFeature && typeof perFeature === "object") {
+    const zs = Object.values(perFeature)
+      .map((f) => (f && typeof f.current_z === "number" ? f.current_z : NaN))
+      .filter((v) => Number.isFinite(v))
+      .map((v) => Math.abs(v as number));
+    if (zs.length > 0) {
+      const mean = zs.reduce((a, b) => a + b, 0) / zs.length;
+      // z-scores typically 0–3; normalize to ~0–1 by dividing by 3
+      return Math.min(1, mean / 3);
+    }
+  }
+
+  // Legacy flat shape: average finite numeric values
+  const finite = Object.values(d).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   if (finite.length === 0) return 0;
   const mag = Math.abs(finite.reduce((a, b) => a + b, 0) / finite.length);
-  return Number.isFinite(mag) ? mag : 0;
+  return Number.isFinite(mag) ? Math.min(1, mag) : 0;
 }
 
 function deriveStress(csi?: number | null, drift?: Record<string, number> | null): number {
