@@ -33,9 +33,11 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
     setLoading(false);
   };
 
+  const baselineReady = dashboard?.baseline_ready === true;
   const features = latestUpload?.features || dashboard?.feature_summary || {};
-  const csi = latestUpload?.csi ?? dashboard?.latest_csi ?? null;
-  const drift = latestUpload?.drift ?? null;
+  const csi = baselineReady ? (dashboard?.latest_csi ?? null) : null;
+  const drift = baselineReady ? (latestUpload?.drift ?? null) : null;
+  const cards = mapFeaturesToCards(features, csi, drift);
   const cards = mapFeaturesToCards(features, csi, drift);
 
   if (!dashboard) {
