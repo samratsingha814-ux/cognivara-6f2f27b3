@@ -158,15 +158,31 @@ export async function uploadSession(
   formData.append("audio", audioBlob, filename);
   if (transcript) formData.append("transcript", transcript);
 
-  const res = await fetch(proxyUrl("upload"), {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
+  // Retry once on cold-start timeout (Render backend sleeps after inactivity)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(proxyUrl("upload"), { method: "POST", body: formData });
+    if (res.ok) return res.json();
+
     const text = await res.text().catch(() => "");
-    throw new Error(`Upload failed (${res.status}): ${text}`);
+    const isTimeout = res.status === 504 || text.includes("IDLE_TIMEOUT");
+    if (isTimeout && attempt === 0) {
+      // Warm up the backend then retry
+      try { await fetch(proxyUrl("health")); } catch {}
+      await new Promise((r) => setTimeout(r, 1500));
+      continue;
+    }
+    throw new Error(
+      isTimeout
+        ? "The analysis server is waking up from sleep. Please try recording again in 30 seconds."
+        : `Upload failed (${res.status}): ${text}`
+    );
   }
-  return res.json();
+  throw new Error("Upload failed after retry");
+}
+
+/** Ping backend to wake it from cold-start sleep. Fire-and-forget. */
+export function warmupBackend(): void {
+  fetch(proxyUrl("health")).catch(() => {});
 }
 
 /** GET /api/dashboard/{user_id} */
