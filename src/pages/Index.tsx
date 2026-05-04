@@ -7,6 +7,7 @@ import HomeScreen from "@/components/HomeScreen";
 import RecordScreen from "@/components/RecordScreen";
 import DashboardScreen, { LatestUploadData } from "@/components/DashboardScreen";
 import ProfileScreen from "@/components/ProfileScreen";
+import HistoryScreen from "@/components/HistoryScreen";
 import OnboardingScreen from "@/components/OnboardingScreen";
 import Auth from "@/pages/Auth";
 import { useAuth } from "@/hooks/useAuth";
@@ -115,6 +116,8 @@ const Index = () => {
         return <RecordScreen userId={cognivaraUserId} sessionCount={sessionCount} onSessionUploaded={handleSessionUploaded} />;
       case "reports":
         return <DashboardScreen dashboard={dashboard} latestUpload={latestUpload} onRefresh={handleRefreshDashboard} />;
+      case "history":
+        return <HistoryScreen userId={cognivaraUserId} />;
       case "patients":
         return (
           <div className="p-6 flex items-center justify-center min-h-[60vh]">

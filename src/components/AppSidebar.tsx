@@ -1,4 +1,4 @@
-import { LayoutDashboard, AudioLines, FileBarChart, Users, HeartPulse, HelpCircle, User, Plus } from "lucide-react";
+import { LayoutDashboard, AudioLines, FileBarChart, Users, HeartPulse, HelpCircle, User, Plus, History } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,7 +12,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-export type NavSection = "overview" | "voiceLabs" | "reports" | "patients" | "health";
+export type NavSection = "overview" | "voiceLabs" | "reports" | "history" | "patients" | "health";
 
 interface AppSidebarProps {
   activeSection: NavSection;
@@ -25,6 +25,7 @@ const NAV_ITEMS: { id: NavSection; label: string; icon: typeof LayoutDashboard }
   { id: "overview", label: "Cognitive Overview", icon: LayoutDashboard },
   { id: "voiceLabs", label: "Voice Labs", icon: AudioLines },
   { id: "reports", label: "Clinical Reports", icon: FileBarChart },
+  { id: "history", label: "Recording History", icon: History },
   { id: "patients", label: "Patient Data", icon: Users },
   { id: "health", label: "System Health", icon: HeartPulse },
 ];
