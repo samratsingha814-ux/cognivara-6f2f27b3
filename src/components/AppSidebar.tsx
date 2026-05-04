@@ -1,4 +1,4 @@
-import { LayoutDashboard, AudioLines, FileBarChart, Users, HeartPulse, HelpCircle, User, Plus } from "lucide-react";
+import { LayoutDashboard, AudioLines, FileBarChart, Users, HeartPulse, HelpCircle, User, Plus, History } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
