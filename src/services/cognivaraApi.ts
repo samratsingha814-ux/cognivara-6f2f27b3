@@ -36,9 +36,16 @@ export interface UploadResponse {
   linguistic_features: Record<string, number>;
   baseline_ready: boolean;
   z_scores: Record<string, number> | null;
-  drift: Record<string, number> | null;
-  csi: number | null;
+  drift: Record<string, unknown> | null;
+  csi: number | CsiPayload | null;
   analysis_mode: string;
+}
+
+export interface CsiPayload {
+  csi_score?: number | null;
+  raw_csi_score?: number | null;
+  risk_level?: string | null;
+  [key: string]: unknown;
 }
 
 export interface DashboardUser {
@@ -55,7 +62,7 @@ export interface DashboardResponse {
   baseline_ready: boolean;
   baseline_sessions: number;
   latest_csi: number | null;
-  latest_risk_level: string | null;
+  latest_risk_level: string | Record<string, unknown> | null;
   flagged_features: string[];
   feature_summary: Record<string, number>;
   trends: { session_number: number; csi: number; created_at: string }[];
@@ -83,8 +90,8 @@ export interface AnalyzeResponse {
   linguistic_features: Record<string, number>;
   baseline_ready: boolean;
   z_scores: Record<string, number> | null;
-  drift: Record<string, number> | null;
-  csi: number | null;
+  drift: Record<string, unknown> | null;
+  csi: number | CsiPayload | null;
 }
 
 export interface HealthResponse {
@@ -225,7 +232,7 @@ export async function analyzeText(userId: string, text: string): Promise<Analyze
  * Map 30 raw backend features into 6 UI cards.
  * Accepts merged acoustic + temporal + linguistic features.
  */
-export function mapFeaturesToCards(features: Record<string, unknown>, csi?: number | null, drift?: Record<string, number> | null) {
+export function mapFeaturesToCards(features: Record<string, unknown>, csi?: number | null, drift?: Record<string, unknown> | null) {
   const safe = (key: string): number | null => {
     const v = features?.[key];
     return typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -239,6 +246,39 @@ export function mapFeaturesToCards(features: Record<string, unknown>, csi?: numb
     fluency: deriveFluency(safe("speech_rate"), safe("speech_ratio"), safe("rhythm_consistency")),
     emotionalStability: deriveEmotionalStability(csi, drift),
   };
+}
+
+export function getCsiScore(csi?: number | CsiPayload | null, fallback?: number | null): number | null {
+  if (typeof csi === "number" && Number.isFinite(csi)) {
+    return Math.max(0, Math.min(100, Math.round(csi)));
+  }
+
+  if (csi && typeof csi === "object") {
+    const payload = csi as CsiPayload;
+    const preferred = typeof payload.csi_score === "number" && Number.isFinite(payload.csi_score)
+      ? payload.csi_score
+      : typeof payload.raw_csi_score === "number" && Number.isFinite(payload.raw_csi_score)
+        ? payload.raw_csi_score
+        : null;
+
+    if (preferred != null) {
+      return Math.max(0, Math.min(100, Math.round(preferred)));
+    }
+  }
+
+  if (typeof fallback === "number" && Number.isFinite(fallback)) {
+    return Math.max(0, Math.min(100, Math.round(fallback)));
+  }
+
+  return null;
+}
+
+export function getRiskLevel(csi?: number | CsiPayload | null, fallback?: unknown): string | null {
+  if (csi && typeof csi === "object" && typeof (csi as CsiPayload).risk_level === "string") {
+    return (csi as CsiPayload).risk_level ?? null;
+  }
+
+  return typeof fallback === "string" ? fallback : null;
 }
 
 function safeDriftMag(drift?: Record<string, unknown> | null): number {
@@ -271,7 +311,7 @@ function safeDriftMag(drift?: Record<string, unknown> | null): number {
   return Number.isFinite(mag) ? Math.min(1, mag) : 0;
 }
 
-function deriveStress(csi?: number | null, drift?: Record<string, number> | null): number {
+function deriveStress(csi?: number | null, drift?: Record<string, unknown> | null): number {
   if (csi == null || !Number.isFinite(csi)) return 0;
   const driftMag = safeDriftMag(drift);
   const result = Math.round(Math.min(100, Math.max(0, (100 - csi) * 0.6 + driftMag * 40)));
@@ -312,7 +352,7 @@ function deriveFluency(rate: number | null, ratio: number | null, rhythm: number
   return factors > 0 ? Math.round(score / factors) : 0;
 }
 
-function deriveEmotionalStability(csi?: number | null, drift?: Record<string, number> | null): number {
+function deriveEmotionalStability(csi?: number | null, drift?: Record<string, unknown> | null): number {
   if (csi == null || !Number.isFinite(csi)) return 0;
   const driftMag = safeDriftMag(drift);
   const result = Math.round(Math.min(100, Math.max(0, csi * 0.7 + (1 - Math.min(1, driftMag)) * 30)));
