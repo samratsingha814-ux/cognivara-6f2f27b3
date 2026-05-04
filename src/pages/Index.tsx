@@ -7,6 +7,7 @@ import HomeScreen from "@/components/HomeScreen";
 import RecordScreen from "@/components/RecordScreen";
 import DashboardScreen, { LatestUploadData } from "@/components/DashboardScreen";
 import ProfileScreen from "@/components/ProfileScreen";
+import HistoryScreen from "@/components/HistoryScreen";
 import OnboardingScreen from "@/components/OnboardingScreen";
 import Auth from "@/pages/Auth";
 import { useAuth } from "@/hooks/useAuth";
