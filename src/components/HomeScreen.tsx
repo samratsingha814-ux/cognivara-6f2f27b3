@@ -13,9 +13,10 @@ interface HomeScreenProps {
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount }: HomeScreenProps) => {
-  const csiRaw = dashboard?.latest_csi ?? latestUpload?.csi ?? null;
+  const baselineReady = dashboard?.baseline_ready === true;
+  const csiRaw = baselineReady ? (dashboard?.latest_csi ?? null) : null;
   const cognitiveScore = csiRaw != null ? Math.round(csiRaw) : 0;
-  const hasData = csiRaw != null;
+  const hasData = baselineReady && csiRaw != null;
   const weeklyData = dashboard?.trends?.map((t) => t.csi) || [];
   const circumference = 2 * Math.PI * 70;
   const offset = circumference - (cognitiveScore / 100) * circumference;
