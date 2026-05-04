@@ -21,6 +21,11 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
 
   const currentSessionNum = sessionCount + 1;
 
+  // Wake the backend from cold-start as soon as the user opens the record screen
+  useEffect(() => {
+    warmupBackend();
+  }, []);
+
   const handleStart = useCallback(async () => {
     setUploadError("");
     audioChunksRef.current = [];
