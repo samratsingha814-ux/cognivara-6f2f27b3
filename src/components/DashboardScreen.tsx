@@ -38,7 +38,6 @@ const DashboardScreen = ({ dashboard, latestUpload, onRefresh }: DashboardScreen
   const csi = baselineReady ? (dashboard?.latest_csi ?? null) : null;
   const drift = baselineReady ? (latestUpload?.drift ?? null) : null;
   const cards = mapFeaturesToCards(features, csi, drift);
-  const cards = mapFeaturesToCards(features, csi, drift);
 
   if (!dashboard) {
     return (
