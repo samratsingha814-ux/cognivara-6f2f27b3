@@ -318,9 +318,10 @@ function safeDriftMag(drift?: Record<string, unknown> | null): number {
 }
 
 function deriveStress(csi?: number | null, drift?: Record<string, unknown> | null): number {
+  // Convention: LOWER CSI = more stable. So stress scales with CSI directly.
   if (csi == null || !Number.isFinite(csi)) return 0;
   const driftMag = safeDriftMag(drift);
-  const result = Math.round(Math.min(100, Math.max(0, (100 - csi) * 0.6 + driftMag * 40)));
+  const result = Math.round(Math.min(100, Math.max(0, csi * 0.6 + driftMag * 40)));
   return Number.isFinite(result) ? result : 0;
 }
 
