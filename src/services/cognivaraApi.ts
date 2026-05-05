@@ -273,8 +273,12 @@ export function getCsiScore(csi?: number | CsiPayload | null, fallback?: number 
   return null;
 }
 
-/** Convert backend CSI (higher = more stable) into a risk score (higher = worse). */
+/** In our convention, LOWER CSI = more stable. Risk score = CSI itself; stability = 100 - CSI. */
 export function getRiskScore(csi?: number | CsiPayload | null, fallback?: number | null): number | null {
+  return getCsiScore(csi, fallback);
+}
+
+export function getStabilityScore(csi?: number | CsiPayload | null, fallback?: number | null): number | null {
   const score = getCsiScore(csi, fallback);
   return score == null ? null : Math.max(0, Math.min(100, 100 - score));
 }
@@ -318,9 +322,10 @@ function safeDriftMag(drift?: Record<string, unknown> | null): number {
 }
 
 function deriveStress(csi?: number | null, drift?: Record<string, unknown> | null): number {
+  // Convention: LOWER CSI = more stable. So stress scales with CSI directly.
   if (csi == null || !Number.isFinite(csi)) return 0;
   const driftMag = safeDriftMag(drift);
-  const result = Math.round(Math.min(100, Math.max(0, (100 - csi) * 0.6 + driftMag * 40)));
+  const result = Math.round(Math.min(100, Math.max(0, csi * 0.6 + driftMag * 40)));
   return Number.isFinite(result) ? result : 0;
 }
 
@@ -359,8 +364,9 @@ function deriveFluency(rate: number | null, ratio: number | null, rhythm: number
 }
 
 function deriveEmotionalStability(csi?: number | null, drift?: Record<string, unknown> | null): number {
+  // Convention: LOWER CSI = more stable. Stability = inverse of CSI, dampened by drift.
   if (csi == null || !Number.isFinite(csi)) return 0;
   const driftMag = safeDriftMag(drift);
-  const result = Math.round(Math.min(100, Math.max(0, csi * 0.7 + (1 - Math.min(1, driftMag)) * 30)));
+  const result = Math.round(Math.min(100, Math.max(0, (100 - csi) * 0.7 + (1 - Math.min(1, driftMag)) * 30)));
   return Number.isFinite(result) ? result : 0;
 }
