@@ -52,8 +52,8 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
 
           {hasData ? (
             <div className="flex flex-col items-center">
-              <div className="relative mb-4">
-                <svg width="180" height="180" viewBox="0 0 180 180" className="score-ring">
+              <div className="relative mb-3 sm:mb-4 h-[140px] w-[140px] sm:h-[180px] sm:w-[180px]">
+                <svg viewBox="0 0 180 180" className="h-full w-full score-ring">
                   <circle cx="90" cy="90" r="70" fill="none" stroke="hsl(222, 18%, 16%)" strokeWidth="10" />
                   <circle
                     cx="90" cy="90" r="70" fill="none"
@@ -69,26 +69,26 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
                   </defs>
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="font-heading text-5xl font-bold text-foreground">{cognitiveScore}</span>
+                  <span className="font-heading text-4xl sm:text-5xl font-bold text-foreground">{cognitiveScore}</span>
                   <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-medium">
                     {scoreLabel}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-8 mt-2">
+              <div className="flex items-center gap-6 sm:gap-8 mt-1 sm:mt-2">
                 <div className="text-center">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stress</p>
-                  <p className="font-heading text-lg font-bold text-foreground">{riskScore}/100</p>
+                  <p className="font-heading text-base sm:text-lg font-bold text-foreground">{riskScore}/100</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stability</p>
-                  <p className="font-heading text-lg font-bold text-foreground">{stabilityScore}/100</p>
+                  <p className="font-heading text-base sm:text-lg font-bold text-foreground">{stabilityScore}/100</p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="py-10 text-center">
+            <div className="py-6 sm:py-10 text-center">
               <p className="text-sm text-muted-foreground">
                 Complete {sessionsRemaining} more recording{sessionsRemaining !== 1 ? "s" : ""} to unlock analysis.
               </p>
@@ -102,18 +102,18 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="rounded-2xl bg-card border border-border p-6 shadow-card flex flex-col justify-between"
+          className="rounded-2xl bg-card border border-border p-4 sm:p-6 shadow-card flex flex-col justify-between"
         >
           <div>
-            <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center mb-4">
-              <Activity className="h-5 w-5 text-primary" />
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-secondary flex items-center justify-center mb-3 sm:mb-4">
+              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
-            <h2 className="font-heading text-2xl font-bold text-foreground mb-2">Start Voice Analysis</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <h2 className="font-heading text-xl sm:text-2xl font-bold text-foreground mb-2">Start Voice Analysis</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-3 sm:line-clamp-none">
               Calibrate clinical markers through real-time acoustic phenotyping. Capture linguistic nuances to detect subtle neuro-cognitive shifts.
             </p>
           </div>
-          <div className="flex items-center justify-between mt-6">
+          <div className="flex items-center justify-between mt-4 sm:mt-6">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
                 <Users className="h-3.5 w-3.5 text-primary-foreground" />
@@ -122,7 +122,7 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
             </div>
             <button
               onClick={onStartRecording}
-              className="flex items-center gap-2 bg-card border border-border px-5 py-2.5 rounded-xl font-heading font-semibold text-sm text-foreground hover:bg-secondary transition-colors"
+              className="flex items-center gap-2 bg-card border border-border px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-heading font-semibold text-sm text-foreground hover:bg-secondary transition-colors"
             >
               Initialize Labs
               <ArrowRight className="h-4 w-4" />
@@ -131,8 +131,8 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
         </motion.div>
       </div>
 
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+      {/* Bottom Row — hidden on mobile to keep page short */}
+      <div className="hidden sm:grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
         {/* Performance Trends */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -216,8 +216,8 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
+      {/* Footer — desktop only, mobile keeps the page short */}
+      <div className="hidden sm:flex items-center justify-between mt-8 pt-4 border-t border-border">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-accent" />
