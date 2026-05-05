@@ -91,10 +91,10 @@ const DashboardScreen = ({ dashboard, latestUpload, recordingsCompleted, onRefre
         >
           <span className="font-heading text-6xl font-bold text-foreground">{score}</span>
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mt-2">
-            Cognitive Stability Index
+            Cognitive Stress Index
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">
-            Higher = more stable · Risk score {100 - score}/100
+            Lower = more stable · Stability {100 - score}/100
           </p>
           {typeof riskLevel === "string" && (
             <p className={`text-xs font-semibold mt-2 uppercase tracking-wider ${

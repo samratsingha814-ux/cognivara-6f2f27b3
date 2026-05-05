@@ -81,12 +81,12 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
 
               <div className="flex items-center gap-8 mt-2">
                 <div className="text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stability</p>
-                  <p className="font-heading text-lg font-bold text-foreground">{cognitiveScore}/100</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stress</p>
+                  <p className="font-heading text-lg font-bold text-foreground">{riskScore}/100</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Risk</p>
-                  <p className="font-heading text-lg font-bold text-foreground">{riskScore}/100</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stability</p>
+                  <p className="font-heading text-lg font-bold text-foreground">{stabilityScore}/100</p>
                 </div>
               </div>
             </div>
