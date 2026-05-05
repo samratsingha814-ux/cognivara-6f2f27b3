@@ -360,8 +360,9 @@ function deriveFluency(rate: number | null, ratio: number | null, rhythm: number
 }
 
 function deriveEmotionalStability(csi?: number | null, drift?: Record<string, unknown> | null): number {
+  // Convention: LOWER CSI = more stable. Stability = inverse of CSI, dampened by drift.
   if (csi == null || !Number.isFinite(csi)) return 0;
   const driftMag = safeDriftMag(drift);
-  const result = Math.round(Math.min(100, Math.max(0, csi * 0.7 + (1 - Math.min(1, driftMag)) * 30)));
+  const result = Math.round(Math.min(100, Math.max(0, (100 - csi) * 0.7 + (1 - Math.min(1, driftMag)) * 30)));
   return Number.isFinite(result) ? result : 0;
 }
