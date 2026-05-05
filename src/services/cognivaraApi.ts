@@ -273,8 +273,12 @@ export function getCsiScore(csi?: number | CsiPayload | null, fallback?: number 
   return null;
 }
 
-/** Convert backend CSI (higher = more stable) into a risk score (higher = worse). */
+/** In our convention, LOWER CSI = more stable. Risk score = CSI itself; stability = 100 - CSI. */
 export function getRiskScore(csi?: number | CsiPayload | null, fallback?: number | null): number | null {
+  return getCsiScore(csi, fallback);
+}
+
+export function getStabilityScore(csi?: number | CsiPayload | null, fallback?: number | null): number | null {
   const score = getCsiScore(csi, fallback);
   return score == null ? null : Math.max(0, Math.min(100, 100 - score));
 }

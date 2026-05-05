@@ -21,8 +21,9 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
   const weeklyData = dashboard?.trends?.map((t) => t.csi) || [];
   const circumference = 2 * Math.PI * 70;
   const offset = circumference - (cognitiveScore / 100) * circumference;
-  const riskScore = hasData ? 100 - cognitiveScore : 0;
-  const scoreLabel = cognitiveScore >= 70 ? "STABLE" : cognitiveScore >= 40 ? "MODERATE" : "AT RISK";
+  const riskScore = hasData ? cognitiveScore : 0;
+  const stabilityScore = hasData ? 100 - cognitiveScore : 0;
+  const scoreLabel = cognitiveScore <= 30 ? "STABLE" : cognitiveScore <= 60 ? "MODERATE" : "AT RISK";
   const sessionsRemaining = Math.max(0, 3 - recordingsCompleted);
   const riskLevel = getRiskLevel(latestUpload?.csi ?? null, dashboard?.latest_risk_level);
 
@@ -48,9 +49,9 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
           className="rounded-2xl bg-gradient-card border border-border p-6 shadow-card"
         >
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mb-1">
-            Cognitive Stability Index
+            Cognitive Stress Index
           </p>
-          <p className="text-[10px] text-muted-foreground mb-4">Higher = more stable</p>
+          <p className="text-[10px] text-muted-foreground mb-4">Lower = more stable</p>
 
           {hasData ? (
             <div className="flex flex-col items-center">
