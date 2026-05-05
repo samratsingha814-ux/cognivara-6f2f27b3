@@ -28,25 +28,22 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
   const riskLevel = getRiskLevel(latestUpload?.csi ?? null, dashboard?.latest_risk_level);
 
   return (
-    <div className="p-4 sm:p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">System Diagnostic</h1>
+    <div className="p-3 sm:p-6">
+      <div className="mb-3 sm:mb-6">
+        <h1 className="font-heading text-xl sm:text-3xl font-bold text-foreground">System Diagnostic</h1>
         <div className="flex items-center gap-2 mt-1">
           <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[11px] sm:text-xs text-muted-foreground">
             Neural Link Active — Processing biological telemetry
           </span>
         </div>
       </div>
 
-      {/* Top Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-6">
-        {/* Morning Baseline / CSI Score Card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 mb-4 sm:mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl bg-gradient-card border border-border p-6 shadow-card"
+          className="rounded-2xl bg-gradient-card border border-border p-4 sm:p-6 shadow-card"
         >
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mb-1">
             Cognitive Stress Index
