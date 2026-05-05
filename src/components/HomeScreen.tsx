@@ -21,7 +21,8 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
   const weeklyData = dashboard?.trends?.map((t) => t.csi) || [];
   const circumference = 2 * Math.PI * 70;
   const offset = circumference - (cognitiveScore / 100) * circumference;
-  const scoreLabel = cognitiveScore >= 70 ? "OPTIMAL" : cognitiveScore >= 40 ? "MODERATE" : "LOW";
+  const riskScore = hasData ? 100 - cognitiveScore : 0;
+  const scoreLabel = cognitiveScore >= 70 ? "STABLE" : cognitiveScore >= 40 ? "MODERATE" : "AT RISK";
   const sessionsRemaining = Math.max(0, 3 - recordingsCompleted);
   const riskLevel = getRiskLevel(latestUpload?.csi ?? null, dashboard?.latest_risk_level);
 
@@ -46,9 +47,10 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
           animate={{ opacity: 1, y: 0 }}
           className="rounded-2xl bg-gradient-card border border-border p-6 shadow-card"
         >
-          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mb-4">
-            Morning Baseline
+          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mb-1">
+            Cognitive Stability Index
           </p>
+          <p className="text-[10px] text-muted-foreground mb-4">Higher = more stable</p>
 
           {hasData ? (
             <div className="flex flex-col items-center">
@@ -79,13 +81,11 @@ const HomeScreen = ({ onStartRecording, dashboard, latestUpload, sessionCount, r
               <div className="flex items-center gap-8 mt-2">
                 <div className="text-center">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stability</p>
-                  <p className="font-heading text-lg font-bold text-foreground">
-                    {riskLevel === "low" ? "+4.2%" : "-1.8%"}
-                  </p>
+                  <p className="font-heading text-lg font-bold text-foreground">{cognitiveScore}/100</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Rank</p>
-                  <p className="font-heading text-lg font-bold text-foreground">Top 12%</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Risk</p>
+                  <p className="font-heading text-lg font-bold text-foreground">{riskScore}/100</p>
                 </div>
               </div>
             </div>

@@ -273,6 +273,12 @@ export function getCsiScore(csi?: number | CsiPayload | null, fallback?: number 
   return null;
 }
 
+/** Convert backend CSI (higher = more stable) into a risk score (higher = worse). */
+export function getRiskScore(csi?: number | CsiPayload | null, fallback?: number | null): number | null {
+  const score = getCsiScore(csi, fallback);
+  return score == null ? null : Math.max(0, Math.min(100, 100 - score));
+}
+
 export function getRiskLevel(csi?: number | CsiPayload | null, fallback?: unknown): string | null {
   if (csi && typeof csi === "object" && typeof (csi as CsiPayload).risk_level === "string") {
     return (csi as CsiPayload).risk_level ?? null;
