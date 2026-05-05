@@ -1,33 +1,52 @@
 type WebkitWindow = Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext };
 
-const MIME_TYPE_CANDIDATES = [
+const DEFAULT_MIME_CANDIDATES = [
   "audio/webm;codecs=opus",
   "audio/ogg;codecs=opus",
   "audio/mp4",
   "audio/webm",
 ] as const;
 
+const SAFARI_MIME_CANDIDATES = [
+  "audio/mp4",
+  "audio/aac",
+  "audio/webm;codecs=opus",
+  "audio/webm",
+] as const;
+
+function isSafariOrIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && (navigator as any).maxTouchPoints > 1);
+  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+  return isIOS || isSafari;
+}
+
 export function getPreferredAudioMimeType(): string {
-  return MIME_TYPE_CANDIDATES.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) ?? "";
+  const list = isSafariOrIOS() ? SAFARI_MIME_CANDIDATES : DEFAULT_MIME_CANDIDATES;
+  return list.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) ?? "";
 }
 
 export async function convertAudioBlobToWav(blob: Blob): Promise<Blob> {
-  const AudioContextCtor = window.AudioContext || (window as WebkitWindow).webkitAudioContext;
+  if (!blob || blob.size === 0) {
+    throw new Error("No audio was captured. Please try recording again.");
+  }
 
+  const AudioContextCtor = window.AudioContext || (window as WebkitWindow).webkitAudioContext;
   if (!AudioContextCtor) {
-    throw new Error("This browser cannot convert recorded audio for upload.");
+    // Fall back: send the original blob; backend accepts webm/mp4
+    return blob;
   }
 
   const audioContext = new AudioContextCtor();
-
   try {
     const inputBuffer = await blob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(inputBuffer.slice(0));
     const wavBuffer = audioBufferToWav(audioBuffer);
-
     return new Blob([wavBuffer], { type: "audio/wav" });
   } catch {
-    throw new Error("The recorded audio could not be prepared for upload. Please try again.");
+    // Graceful fallback: server can decode the original encoded audio
+    return blob;
   } finally {
     await audioContext.close().catch(() => undefined);
   }

@@ -54,24 +54,39 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
     const recordedMime = recorder?.mimeType || "audio/webm";
     let recordedBlob = new Blob([], { type: recordedMime });
 
-    if (recorder && recorder.state !== "inactive") {
-      await new Promise<void>((resolve) => {
-        recorder.onstop = () => resolve();
-        recorder.stop();
-      });
-
-      if (audioChunksRef.current.length > 0) {
-        recordedBlob = new Blob(audioChunksRef.current, { type: recordedMime });
+    try {
+      if (recorder && recorder.state !== "inactive") {
+        await new Promise<void>((resolve) => {
+          recorder.onstop = () => resolve();
+          try { recorder.requestData(); } catch {}
+          try { recorder.stop(); } catch { resolve(); }
+        });
       }
+    } finally {
+      // Always release the mic, even if recorder was already inactive
+      try {
+        recorder?.stream?.getTracks().forEach((t) => t.stop());
+      } catch {}
+    }
 
-      recorder.stream.getTracks().forEach((track) => track.stop());
+    if (audioChunksRef.current.length > 0) {
+      recordedBlob = new Blob(audioChunksRef.current, { type: recordedMime });
+    }
+
+    // Reset for next cycle
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+
+    if (recordedBlob.size === 0) {
+      setUploadError("No audio captured. Please grant mic permission and try again.");
+      return;
     }
 
     setIsUploading(true);
-
     try {
       const wavBlob = await convertAudioBlobToWav(recordedBlob);
-      const result = await uploadSession(userId, wavBlob, transcript || "", "recording.wav");
+      const ext = (wavBlob.type.includes("wav") ? "wav" : wavBlob.type.includes("mp4") ? "m4a" : "webm");
+      const result = await uploadSession(userId, wavBlob, transcript || "", `recording.${ext}`);
       onSessionUploaded(result);
     } catch (err: any) {
       setUploadError(err.message || "Upload failed");
