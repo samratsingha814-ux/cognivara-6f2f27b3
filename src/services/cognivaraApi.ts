@@ -174,7 +174,7 @@ export async function createUser(data: {
   return result;
 }
 
-/** POST /api/upload — multipart/form-data */
+/** POST /api/upload — multipart/form-data. Bypasses edge proxy to avoid 150s timeout. */
 export async function uploadSession(
   userId: string,
   audioBlob: Blob,
@@ -186,23 +186,32 @@ export async function uploadSession(
   formData.append("audio", audioBlob, filename);
   if (transcript) formData.append("transcript", transcript);
 
-  // Retry once on cold-start timeout (Render backend sleeps after inactivity)
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(proxyUrl("upload"), { method: "POST", body: formData });
-    if (res.ok) return res.json();
+  // Make sure Render is awake before posting the audio.
+  await ensureBackendWarm();
 
-    const text = await res.text().catch(() => "");
-    const isTimeout = res.status === 504 || text.includes("IDLE_TIMEOUT");
+  const tryPost = async (url: string) => fetch(url, { method: "POST", body: formData });
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await tryPost(directUrl("upload"));
+    } catch {
+      // Network/CORS — fall back to proxy
+      try { res = await tryPost(proxyUrl("upload")); } catch { res = null; }
+    }
+
+    if (res && res.ok) return res.json();
+
+    const text = res ? await res.text().catch(() => "") : "";
+    const isTimeout = !res || res.status === 504 || res.status === 502 || text.includes("IDLE_TIMEOUT");
     if (isTimeout && attempt === 0) {
-      // Warm up the backend then retry
-      try { await fetch(proxyUrl("health")); } catch {}
-      await new Promise((r) => setTimeout(r, 1500));
+      await ensureBackendWarm(60000);
       continue;
     }
     throw new Error(
       isTimeout
-        ? "The analysis server is waking up from sleep. Please try recording again in 30 seconds."
-        : `Upload failed (${res.status}): ${text}`
+        ? "The analysis server is waking up. Please try recording again in 30 seconds."
+        : `Upload failed (${res?.status ?? "network"}): ${text}`
     );
   }
   throw new Error("Upload failed after retry");
@@ -210,7 +219,7 @@ export async function uploadSession(
 
 /** Ping backend to wake it from cold-start sleep. Fire-and-forget. */
 export function warmupBackend(): void {
-  fetch(proxyUrl("health")).catch(() => {});
+  fetch(directUrl("health")).catch(() => {});
 }
 
 /** GET /api/dashboard/{user_id} */
