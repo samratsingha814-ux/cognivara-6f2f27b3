@@ -18,6 +18,12 @@ const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
 
   const email = user?.email || "";
 
+  // Warm Render backend while the user fills the form so cold-start
+  // doesn't push profile creation past the edge timeout.
+  useEffect(() => {
+    warmupBackend();
+  }, []);
+
   const handleSubmit = async () => {
     if (!name.trim()) {
       setError("Please enter your name.");
