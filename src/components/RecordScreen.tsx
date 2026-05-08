@@ -18,6 +18,7 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
   const [uploadError, setUploadError] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const failedOnceRef = useRef(false);
 
   const currentSessionNum = sessionCount + 1;
 
@@ -32,12 +33,13 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = getPreferredAudioMimeType();
+      // After a previous failure, let Safari pick its own MIME type.
+      const mimeType = failedOnceRef.current ? "" : getPreferredAudioMimeType();
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
       mediaRecorderRef.current = recorder;
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+        if (event.data && event.data.size > 0) audioChunksRef.current.push(event.data);
       };
       recorder.start(250);
     } catch {
@@ -57,28 +59,33 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
     try {
       if (recorder && recorder.state !== "inactive") {
         await new Promise<void>((resolve) => {
-          recorder.onstop = () => resolve();
+          let settled = false;
+          const finish = () => { if (!settled) { settled = true; resolve(); } };
+          // Wait for either onstop or a final ondataavailable, whichever comes last.
+          recorder.onstop = () => setTimeout(finish, 100);
+          // Safety timeout in case the browser never fires onstop.
+          const safety = setTimeout(finish, 1800);
           try { recorder.requestData(); } catch {}
-          try { recorder.stop(); } catch { resolve(); }
+          try { recorder.stop(); } catch { clearTimeout(safety); finish(); }
         });
       }
     } finally {
-      // Always release the mic, even if recorder was already inactive
-      try {
-        recorder?.stream?.getTracks().forEach((t) => t.stop());
-      } catch {}
+      try { recorder?.stream?.getTracks().forEach((t) => t.stop()); } catch {}
+      // Let iOS Safari release the mic hardware before the next cycle.
+      await new Promise((r) => setTimeout(r, 200));
     }
 
     if (audioChunksRef.current.length > 0) {
       recordedBlob = new Blob(audioChunksRef.current, { type: recordedMime });
     }
 
-    // Reset for next cycle
     mediaRecorderRef.current = null;
     audioChunksRef.current = [];
 
-    if (recordedBlob.size === 0) {
-      setUploadError("No audio captured. Please grant mic permission and try again.");
+    // Reject obviously broken/short captures (iOS sometimes emits a tiny header-less chunk).
+    if (recordedBlob.size < 2048) {
+      failedOnceRef.current = true;
+      setUploadError("Recording too short or no audio captured. Please try again.");
       return;
     }
 
@@ -87,8 +94,10 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
       const wavBlob = await convertAudioBlobToWav(recordedBlob);
       const ext = (wavBlob.type.includes("wav") ? "wav" : wavBlob.type.includes("mp4") ? "m4a" : "webm");
       const result = await uploadSession(userId, wavBlob, transcript || "", `recording.${ext}`);
+      failedOnceRef.current = false;
       onSessionUploaded(result);
     } catch (err: any) {
+      failedOnceRef.current = true;
       setUploadError(err.message || "Upload failed");
     } finally {
       setIsUploading(false);
