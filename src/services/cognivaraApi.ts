@@ -153,6 +153,39 @@ export async function checkHealth(): Promise<HealthResponse> {
   return res.json();
 }
 
+/**
+ * Direct-first request helper. Tries the Render backend directly to avoid the
+ * 150s edge-function ceiling. Falls back to the edge proxy on network/CORS
+ * errors, and warms + retries on cold-start timeouts.
+ */
+async function requestBackend(path: string, init: RequestInit = {}): Promise<Response> {
+  const tryFetch = (url: string) => fetch(url, init);
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await tryFetch(directUrl(path));
+    } catch {
+      try { res = await tryFetch(proxyUrl(path)); } catch { res = null; }
+    }
+
+    if (res && res.ok) return res;
+
+    const status = res?.status ?? 0;
+    const text = res ? await res.clone().text().catch(() => "") : "";
+    const isTimeout = !res || status === 504 || status === 502 || text.includes("IDLE_TIMEOUT");
+
+    if (isTimeout && attempt === 0) {
+      await ensureBackendWarm(60000);
+      continue;
+    }
+
+    if (res) return res; // non-timeout error — let caller read it
+    throw new Error("Network error contacting backend");
+  }
+  throw new Error("The analysis server is waking up. Please try again in ~30 seconds.");
+}
+
 /** POST /api/user — multipart/form-data */
 export async function createUser(data: {
   name: string;
@@ -168,10 +201,9 @@ export async function createUser(data: {
   if (data.gender) formData.append("gender", data.gender);
   if (data.password) formData.append("password", data.password);
 
-  const res = await fetch(proxyUrl("user"), {
-    method: "POST",
-    body: formData,
-  });
+  await ensureBackendWarm();
+
+  const res = await requestBackend("user", { method: "POST", body: formData });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`User creation failed (${res.status}): ${text}`);

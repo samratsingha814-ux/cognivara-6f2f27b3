@@ -1,40 +1,35 @@
-## Issue 1 — Edge function 504 `IDLE_TIMEOUT` on upload
+## Problem
 
-### Root cause
-`supabase/functions/cognivara-proxy` opens a fetch to Render and `await`s the full response. Supabase edge functions have a hard **150s idle timeout**; when Render is cold-starting, audio analysis takes longer than 150s and the proxy is killed before Render replies. The current retry on the client just repeats the same 150s wait.
+Creating a neural profile hangs forever and eventually fails with `IDLE_TIMEOUT`. Root cause: `createUser` (and `getDashboard`, `getSessions`, `analyzeText`) still go through the `cognivara-proxy` edge function. When the Render backend is cold (sleeping after inactivity), the request sits inside the edge function past its 150s ceiling and the user sees a 504 / spinner-forever. Only `uploadSession` and health currently bypass the proxy.
 
-### Fix
-Two complementary changes:
+## Fix (frontend only — `src/services/cognivaraApi.ts`)
 
-1. **Aggressive warmup before upload** (`src/services/cognivaraApi.ts`)
-   - New `ensureBackendWarm()`: polls `proxyUrl("health")` every 2s for up to 45s, resolves as soon as health returns `{ status: "healthy" }` (or similar 200).
-   - `RecordScreen` calls it on mount AND `uploadSession` awaits it before the first POST. This means by the time the user finishes a 30s recording, Render is already warm, so analysis fits inside 150s.
-   - Keep the one-time retry, but only retry after another `ensureBackendWarm()` succeeds.
+1. **Generic direct-first request helper** `requestBackend(path, init)`:
+   - Try `directUrl(path)` first.
+   - On network/CORS error or 5xx, fall back to `proxyUrl(path)` once.
+   - On 504 / `IDLE_TIMEOUT` text, run `ensureBackendWarm(60_000)` and retry the direct call once.
+   - Returns the parsed JSON or throws a friendly error.
 
-2. **Skip the proxy for `/upload`** when possible (`src/services/cognivaraApi.ts`)
-   - The Render backend already returns permissive CORS for `/api/upload` (verified via the dashboard/sessions calls that work directly). Send the multipart POST straight to `https://cognivara-backend-service.onrender.com/api/upload`, bypassing the 150s edge function ceiling entirely. Render itself allows long requests.
-   - Keep the proxy as a fallback if the direct call fails with a network/CORS error.
+2. **`createUser`**:
+   - Call `ensureBackendWarm()` before POSTing (so cold start happens before the user's click finishes).
+   - Use the new helper instead of `proxyUrl("user")`.
+   - Replace timeout errors with a clear "Server is waking up, please try again in ~30 seconds" message.
 
-(No edge-function code change needed — the proxy stays for non-upload calls.)
+3. **`getDashboard`, `getSessions`, `analyzeText`**:
+   - Switch to the new helper so they no longer get killed by the edge timeout.
 
-## Issue 2 — Mobile: 2nd recording fails with "could not be prepared for upload"
+4. **`uploadSession`**:
+   - Refactor to reuse the same helper for consistency (keep current 2-attempt warm-then-retry behaviour).
 
-### Root cause
-On iOS Safari, the second `MediaRecorder` cycle frequently emits a single tiny `ondataavailable` chunk that lacks the container header (because the first cycle's `AudioContext` left the audio worklet in a bad state and `decodeAudioData` rejects). Our fallback in `convertAudioBlobToWav` returns the original blob on decode failure, but the blob from iOS sometimes is `<1 KB` of orphaned media data that the backend rejects with a 400 — surfaced in the UI as the same "could not be prepared" message that's wrapped around the upload error.
+5. **Onboarding UX (`src/components/OnboardingScreen.tsx`)**:
+   - On mount, fire `warmupBackend()` so Render is already starting while the user fills the form.
+   - Surface the friendlier error string from the API service unchanged.
 
-Additionally, `recorder.requestData()` followed immediately by `recorder.stop()` on iOS sometimes fires `onstop` before the requested chunk arrives, so the final segment is dropped.
+6. **Home/Dashboard screens**: no logic change — they already call the API methods, which now route through the helper.
 
-### Fix (`src/components/RecordScreen.tsx` + `src/lib/audio.ts`)
+No backend, edge function, or schema changes. No UI redesign.
 
-1. **Wait for the final chunk explicitly** — in `handleStop`, instead of relying on `onstop`, attach a `ondataavailable` handler and resolve only when we receive a chunk *after* `stop()`. Add a 1.5s safety timeout.
-2. **Drop tiny blobs early** — in `RecordScreen`, after assembling `recordedBlob`, if `size < 2048` bytes show "Recording too short or no audio captured — please try again" instead of attempting upload.
-3. **Force a fresh `AudioContext` per call** — already done, but also ensure the previous context's `close()` actually awaits before the next cycle. Add `await new Promise(r => setTimeout(r, 150))` after track cleanup on iOS to let Safari release the mic hardware.
-4. **Reset MIME priority on retry** — if the second recording's blob is invalid, reinitialize `MediaRecorder` without a `mimeType` argument (let Safari pick its native default) on the next attempt.
+## Files touched
 
-## Files to change
-
-- `src/services/cognivaraApi.ts` — add `ensureBackendWarm()`, switch `uploadSession` to direct backend URL with proxy fallback.
-- `src/components/RecordScreen.tsx` — robust stop sequence, tiny-blob guard, iOS settle delay, MIME fallback on retry.
-- `src/lib/audio.ts` — keep graceful decode fallback; no functional change beyond what's already there.
-
-No backend or edge-function changes.
+- `src/services/cognivaraApi.ts` — add `requestBackend`, refactor `createUser` / `getDashboard` / `getSessions` / `analyzeText` / `uploadSession`.
+- `src/components/OnboardingScreen.tsx` — fire `warmupBackend()` from a `useEffect` on mount.
