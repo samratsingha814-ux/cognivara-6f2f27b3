@@ -5,9 +5,30 @@
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const PROXY_BASE = `${SUPABASE_URL}/functions/v1/cognivara-proxy`;
+const BACKEND_DIRECT = "https://cognivara-backend-service.onrender.com/api";
 
 function proxyUrl(path: string): string {
   return `${PROXY_BASE}?path=${encodeURIComponent(path)}`;
+}
+
+function directUrl(path: string): string {
+  return `${BACKEND_DIRECT}/${path}`;
+}
+
+/** Poll backend health until it responds OK or timeout (ms). Resolves true if warm. */
+export async function ensureBackendWarm(timeoutMs = 45000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(directUrl("health"), { signal: ctrl.signal });
+      clearTimeout(t);
+      if (res.ok) return true;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
 }
 
 // ─── Response Types ───

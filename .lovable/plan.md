@@ -1,54 +1,40 @@
-Two issues to address.
-
-## Issue 1 — Mobile: "recorded audio could not be prepared for upload" on 2nd recording
+## Issue 1 — Edge function 504 `IDLE_TIMEOUT` on upload
 
 ### Root cause
-`convertAudioBlobToWav` in `src/lib/audio.ts` throws a generic error whenever `decodeAudioData` fails. On mobile (iOS Safari especially) the failure on the **second** recording is caused by:
-1. `getPreferredAudioMimeType()` picks `audio/webm;codecs=opus` first — iOS Safari reports `isTypeSupported` true for `audio/mp4` but actually produces broken webm chunks on subsequent recordings.
-2. In `RecordScreen.handleStop`, we wait for `recorder.onstop` but never call `recorder.requestData()` first, so on the second cycle `audioChunksRef.current` can be empty/short → `decodeAudioData` rejects.
-3. The previous `MediaStream` tracks are only stopped inside the `if (recorder.state !== "inactive")` block — if the recorder already auto-stopped (timer/track-ended) the mic stream stays half-open, which on iOS causes the next `getUserMedia` call to return a degraded stream.
+`supabase/functions/cognivara-proxy` opens a fetch to Render and `await`s the full response. Supabase edge functions have a hard **150s idle timeout**; when Render is cold-starting, audio analysis takes longer than 150s and the proxy is killed before Render replies. The current retry on the client just repeats the same 150s wait.
 
-### Fix (3 small changes)
-1. **`src/lib/audio.ts`** — reorder MIME candidates to prefer `audio/mp4` on Safari, and add a graceful fallback: if `decodeAudioData` fails but the blob has bytes, return the original blob (backend already accepts webm/mp4). Only throw when the blob is truly empty.
-2. **`src/components/RecordScreen.tsx` — `handleStop`**:
-   - Call `recorder.requestData()` before `recorder.stop()` so the final chunk is always emitted.
-   - Always stop all stream tracks in a `finally`-style block, not only when recorder was active.
-   - Guard: if `audioChunksRef.current` is empty after stop, show "No audio captured — please try again" instead of attempting conversion.
-   - Null out `mediaRecorderRef.current` and `audioChunksRef.current = []` at the end of every cycle.
-3. **`src/lib/audio.ts` — `getPreferredAudioMimeType`**: detect Safari/iOS via `navigator.userAgent` and prefer `audio/mp4` first on those platforms.
+### Fix
+Two complementary changes:
 
-No backend changes.
+1. **Aggressive warmup before upload** (`src/services/cognivaraApi.ts`)
+   - New `ensureBackendWarm()`: polls `proxyUrl("health")` every 2s for up to 45s, resolves as soon as health returns `{ status: "healthy" }` (or similar 200).
+   - `RecordScreen` calls it on mount AND `uploadSession` awaits it before the first POST. This means by the time the user finishes a 30s recording, Render is already warm, so analysis fits inside 150s.
+   - Keep the one-time retry, but only retry after another `ensureBackendWarm()` succeeds.
 
-## Issue 2 — "Higher CSI means worse, you're calculating it wrong"
+2. **Skip the proxy for `/upload`** when possible (`src/services/cognivaraApi.ts`)
+   - The Render backend already returns permissive CORS for `/api/upload` (verified via the dashboard/sessions calls that work directly). Send the multipart POST straight to `https://cognivara-backend-service.onrender.com/api/upload`, bypassing the 150s edge function ceiling entirely. Render itself allows long requests.
+   - Keep the proxy as a fallback if the direct call fails with a network/CORS error.
 
-### What the backend actually returns
-From the latest upload responses for user 7:
+(No edge-function code change needed — the proxy stays for non-upload calls.)
 
-```
-session 69: csi_score 53, risk_level "low", interpretation "...CSI 53/100, risk level low"
-session 70: csi_score 68, risk_level "low"
-session 71: csi_score 77, risk_level "low"
-biomarker_interpretation: "Cognitive speech patterns appear stable..."
-raw_csi_score (pre-penalty) 79 → csi_score 53 after drift_penalty
-```
+## Issue 2 — Mobile: 2nd recording fails with "could not be prepared for upload"
 
-The backend's convention is **higher CSI = more stable / healthier** (it subtracts a `drift_penalty` from `raw_csi_score`, so a lower final CSI means more drift was detected). The label "low risk" is reported at both 53 and 77 because `risk_level` is bucketed separately from the score itself.
+### Root cause
+On iOS Safari, the second `MediaRecorder` cycle frequently emits a single tiny `ondataavailable` chunk that lacks the container header (because the first cycle's `AudioContext` left the audio worklet in a bad state and `decodeAudioData` rejects). Our fallback in `convertAudioBlobToWav` returns the original blob on decode failure, but the blob from iOS sometimes is `<1 KB` of orphaned media data that the backend rejects with a 400 — surfaced in the UI as the same "could not be prepared" message that's wrapped around the upload error.
 
-So the current frontend math (`stress = (100 - csi) * 0.6 + drift * 40`, treating high CSI as good) **matches the backend**. However the user expects the opposite convention (a "Cognitive Stress Index" where higher = worse), which is the more common clinical reading.
+Additionally, `recorder.requestData()` followed immediately by `recorder.stop()` on iOS sometimes fires `onstop` before the requested chunk arrives, so the final segment is dropped.
 
-### Fix — show both, and label clearly
-Rather than fight the backend, surface the score in the direction the user expects while keeping backend semantics intact:
+### Fix (`src/components/RecordScreen.tsx` + `src/lib/audio.ts`)
 
-1. **Add helper `getRiskScore(csi) = 100 - csi`** in `src/services/cognivaraApi.ts`. Risk score: higher = worse.
-2. **`HomeScreen.tsx` "Morning Baseline" ring**: keep showing CSI but relabel from "OPTIMAL/MODERATE/LOW" to explicit `Stability {csi}/100 · Risk {100-csi}/100` so direction is unambiguous, and invert the threshold colors (green when CSI ≥ 70, red when CSI < 40).
-3. **`DashboardScreen.tsx` CSI Score card**: rename header to "Cognitive Stability Index (CSI)" and add a sub-line "Higher = more stable. Risk score: {100 - csi}". Keep the numeric `csi` so it still matches backend logs.
-4. **`mapFeaturesToCards` "Stress" card**: already uses `(100 - csi)` correctly — confirm the label tooltip reads "Higher = more stress" so a 23% stress reading at CSI 77 makes sense to the user.
-
-No change to the backend score, no change to the math driving the 6 biomarker cards — only labels, colors, and an added risk-score readout so the user can read either direction.
+1. **Wait for the final chunk explicitly** — in `handleStop`, instead of relying on `onstop`, attach a `ondataavailable` handler and resolve only when we receive a chunk *after* `stop()`. Add a 1.5s safety timeout.
+2. **Drop tiny blobs early** — in `RecordScreen`, after assembling `recordedBlob`, if `size < 2048` bytes show "Recording too short or no audio captured — please try again" instead of attempting upload.
+3. **Force a fresh `AudioContext` per call** — already done, but also ensure the previous context's `close()` actually awaits before the next cycle. Add `await new Promise(r => setTimeout(r, 150))` after track cleanup on iOS to let Safari release the mic hardware.
+4. **Reset MIME priority on retry** — if the second recording's blob is invalid, reinitialize `MediaRecorder` without a `mimeType` argument (let Safari pick its native default) on the next attempt.
 
 ## Files to change
-- `src/lib/audio.ts` — MIME priority + graceful decode fallback
-- `src/components/RecordScreen.tsx` — `requestData()`, track cleanup, empty-chunk guard
-- `src/services/cognivaraApi.ts` — add `getRiskScore` helper
-- `src/components/HomeScreen.tsx` — relabel CSI ring with explicit direction
-- `src/components/DashboardScreen.tsx` — relabel CSI card with "higher = more stable" + risk-score sub-line
+
+- `src/services/cognivaraApi.ts` — add `ensureBackendWarm()`, switch `uploadSession` to direct backend URL with proxy fallback.
+- `src/components/RecordScreen.tsx` — robust stop sequence, tiny-blob guard, iOS settle delay, MIME fallback on retry.
+- `src/lib/audio.ts` — keep graceful decode fallback; no functional change beyond what's already there.
+
+No backend or edge-function changes.
