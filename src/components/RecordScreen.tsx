@@ -18,6 +18,7 @@ const RecordScreen = ({ userId, sessionCount, onSessionUploaded }: RecordScreenP
   const [uploadError, setUploadError] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const failedOnceRef = useRef(false);
 
   const currentSessionNum = sessionCount + 1;
 
