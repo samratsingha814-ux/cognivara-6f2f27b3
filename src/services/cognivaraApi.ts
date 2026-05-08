@@ -153,6 +153,39 @@ export async function checkHealth(): Promise<HealthResponse> {
   return res.json();
 }
 
+/**
+ * Direct-first request helper. Tries the Render backend directly to avoid the
+ * 150s edge-function ceiling. Falls back to the edge proxy on network/CORS
+ * errors, and warms + retries on cold-start timeouts.
+ */
+async function requestBackend(path: string, init: RequestInit = {}): Promise<Response> {
+  const tryFetch = (url: string) => fetch(url, init);
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await tryFetch(directUrl(path));
+    } catch {
+      try { res = await tryFetch(proxyUrl(path)); } catch { res = null; }
+    }
+
+    if (res && res.ok) return res;
+
+    const status = res?.status ?? 0;
+    const text = res ? await res.clone().text().catch(() => "") : "";
+    const isTimeout = !res || status === 504 || status === 502 || text.includes("IDLE_TIMEOUT");
+
+    if (isTimeout && attempt === 0) {
+      await ensureBackendWarm(60000);
+      continue;
+    }
+
+    if (res) return res; // non-timeout error — let caller read it
+    throw new Error("Network error contacting backend");
+  }
+  throw new Error("The analysis server is waking up. Please try again in ~30 seconds.");
+}
+
 /** POST /api/user — multipart/form-data */
 export async function createUser(data: {
   name: string;
@@ -168,10 +201,9 @@ export async function createUser(data: {
   if (data.gender) formData.append("gender", data.gender);
   if (data.password) formData.append("password", data.password);
 
-  const res = await fetch(proxyUrl("user"), {
-    method: "POST",
-    body: formData,
-  });
+  await ensureBackendWarm();
+
+  const res = await requestBackend("user", { method: "POST", body: formData });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`User creation failed (${res.status}): ${text}`);
@@ -195,35 +227,14 @@ export async function uploadSession(
   formData.append("audio", audioBlob, filename);
   if (transcript) formData.append("transcript", transcript);
 
-  // Make sure Render is awake before posting the audio.
   await ensureBackendWarm();
 
-  const tryPost = async (url: string) => fetch(url, { method: "POST", body: formData });
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    let res: Response | null = null;
-    try {
-      res = await tryPost(directUrl("upload"));
-    } catch {
-      // Network/CORS — fall back to proxy
-      try { res = await tryPost(proxyUrl("upload")); } catch { res = null; }
-    }
-
-    if (res && res.ok) return res.json();
-
-    const text = res ? await res.text().catch(() => "") : "";
-    const isTimeout = !res || res.status === 504 || res.status === 502 || text.includes("IDLE_TIMEOUT");
-    if (isTimeout && attempt === 0) {
-      await ensureBackendWarm(60000);
-      continue;
-    }
-    throw new Error(
-      isTimeout
-        ? "The analysis server is waking up. Please try recording again in 30 seconds."
-        : `Upload failed (${res?.status ?? "network"}): ${text}`
-    );
+  const res = await requestBackend("upload", { method: "POST", body: formData });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Upload failed (${res.status}): ${text}`);
   }
-  throw new Error("Upload failed after retry");
+  return res.json();
 }
 
 /** Ping backend to wake it from cold-start sleep. Fire-and-forget. */
@@ -233,7 +244,7 @@ export function warmupBackend(): void {
 
 /** GET /api/dashboard/{user_id} */
 export async function getDashboard(userId: string): Promise<DashboardResponse> {
-  const res = await fetch(proxyUrl(`dashboard/${userId}`));
+  const res = await requestBackend(`dashboard/${userId}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Dashboard fetch failed (${res.status}): ${text}`);
@@ -243,7 +254,7 @@ export async function getDashboard(userId: string): Promise<DashboardResponse> {
 
 /** GET /api/sessions/{user_id} */
 export async function getSessions(userId: string): Promise<SessionsResponse> {
-  const res = await fetch(proxyUrl(`sessions/${userId}`));
+  const res = await requestBackend(`sessions/${userId}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Sessions fetch failed (${res.status}): ${text}`);
@@ -253,7 +264,7 @@ export async function getSessions(userId: string): Promise<SessionsResponse> {
 
 /** POST /api/analyze — JSON body */
 export async function analyzeText(userId: string, text: string): Promise<AnalyzeResponse> {
-  const res = await fetch(proxyUrl("analyze"), {
+  const res = await requestBackend("analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: Number(userId), text }),

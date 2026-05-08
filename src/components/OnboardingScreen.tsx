@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Activity, Loader2 } from "lucide-react";
-import { createUser } from "@/services/cognivaraApi";
+import { createUser, warmupBackend } from "@/services/cognivaraApi";
 import { useAuth } from "@/hooks/useAuth";
 
 interface OnboardingScreenProps {
@@ -17,6 +17,12 @@ const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
   const [error, setError] = useState("");
 
   const email = user?.email || "";
+
+  // Warm Render backend while the user fills the form so cold-start
+  // doesn't push profile creation past the edge timeout.
+  useEffect(() => {
+    warmupBackend();
+  }, []);
 
   const handleSubmit = async () => {
     if (!name.trim()) {
