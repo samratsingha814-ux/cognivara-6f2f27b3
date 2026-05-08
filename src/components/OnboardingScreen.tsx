@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Activity, Loader2 } from "lucide-react";
-import { createUser } from "@/services/cognivaraApi";
+import { createUser, warmupBackend } from "@/services/cognivaraApi";
 import { useAuth } from "@/hooks/useAuth";
 
 interface OnboardingScreenProps {
